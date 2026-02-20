@@ -1,0 +1,10 @@
+# Protect config files
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<FilesMatch "^(config\.php|jwt\.php)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

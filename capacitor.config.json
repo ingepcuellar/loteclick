@@ -1,0 +1,14 @@
+{
+    "appId": "com.loteclick.app",
+    "appName": "LoteClick",
+    "webDir": "dist",
+    "server": {
+        "androidScheme": "https",
+        "iosScheme": "https"
+    },
+    "ios": {
+        "contentInset": "automatic",
+        "preferredContentMode": "mobile",
+        "scheme": "LoteClick"
+    }
+}
