@@ -17,10 +17,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build web app
         run: npm run build
@@ -48,13 +47,27 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATES_P12 }}
           p12-password: ${{ secrets.APPLE_CERTIFICATES_PASSWORD }}
 
+      - name: Write App Store Connect API Key
+        run: |
+          mkdir -p ~/private_keys
+          echo '${{ secrets.APPLE_PRIVATE_KEY }}' > ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8
+
       - name: Download provisioning profile
-        uses: apple-actions/download-provisioning-profiles@v3
-        with:
-          bundle-id: 'com.loteclick.app'
-          issuer-id: ${{ secrets.APPLE_ISSUER_ID }}
-          api-key-id: ${{ secrets.APPLE_KEY_ID }}
-          api-private-key: ${{ secrets.APPLE_PRIVATE_KEY }}
+        run: |
+          xcrun notarytool store-credentials "AC_PASSWORD" \
+            --key ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8 \
+            --key-id ${{ secrets.APPLE_KEY_ID }} \
+            --issuer ${{ secrets.APPLE_ISSUER_ID }} 2>/dev/null || true
+          
+          # Use xcodebuild with API key for automatic signing
+          cd ios/App
+          xcodebuild -resolvePackageDependencies \
+            -project App.xcodeproj \
+            -scheme App \
+            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.APPLE_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APPLE_ISSUER_ID }} \
+            -allowProvisioningUpdates
 
       - name: Build iOS app
         run: |
@@ -65,6 +78,9 @@ jobs:
             -sdk iphoneos \
             -configuration Release \
             -archivePath $RUNNER_TEMP/App.xcarchive \
+            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.APPLE_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APPLE_ISSUER_ID }} \
             -allowProvisioningUpdates \
             archive
 
@@ -74,12 +90,16 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/App.xcarchive \
             -exportOptionsPlist exportOptions.plist \
-            -exportPath $RUNNER_TEMP/output
+            -exportPath $RUNNER_TEMP/output \
+            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.APPLE_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APPLE_ISSUER_ID }} \
+            -allowProvisioningUpdates
 
-      - name: Upload to TestFlight
-        uses: apple-actions/upload-testflight-build@v3
-        with:
-          app-path: $RUNNER_TEMP/output/App.ipa
-          issuer-id: ${{ secrets.APPLE_ISSUER_ID }}
-          api-key-id: ${{ secrets.APPLE_KEY_ID }}
-          api-private-key: ${{ secrets.APPLE_PRIVATE_KEY }}
+      - name: Upload to App Store Connect
+        run: |
+          xcrun altool --upload-app \
+            -f $RUNNER_TEMP/output/App.ipa \
+            -t ios \
+            --apiKey ${{ secrets.APPLE_KEY_ID }} \
+            --apiIssuer ${{ secrets.APPLE_ISSUER_ID }}
