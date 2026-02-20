@@ -48,30 +48,11 @@ jobs:
           p12-password: ${{ secrets.APPLE_CERTIFICATES_PASSWORD }}
 
       - name: Write App Store Connect API Key
-        env:
-          API_KEY: ${{ secrets.APPLE_PRIVATE_KEY }}
         run: |
           mkdir -p ~/private_keys
-          echo "$API_KEY" > ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8
-          # Verify key format
+          echo "${{ secrets.APPLE_PRIVATE_KEY_BASE64 }}" | base64 --decode > ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8
+          echo "Key file created, first line:"
           head -1 ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8
-
-      - name: Download provisioning profile
-        run: |
-          xcrun notarytool store-credentials "AC_PASSWORD" \
-            --key ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8 \
-            --key-id ${{ secrets.APPLE_KEY_ID }} \
-            --issuer ${{ secrets.APPLE_ISSUER_ID }} 2>/dev/null || true
-          
-          # Use xcodebuild with API key for automatic signing
-          cd ios/App
-          xcodebuild -resolvePackageDependencies \
-            -project App.xcodeproj \
-            -scheme App \
-            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8 \
-            -authenticationKeyID ${{ secrets.APPLE_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APPLE_ISSUER_ID }} \
-            -allowProvisioningUpdates
 
       - name: Build iOS app
         run: |
