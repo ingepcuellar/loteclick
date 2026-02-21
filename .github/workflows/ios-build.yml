@@ -89,5 +89,7 @@ jobs:
           xcrun altool --upload-app \
             -f $RUNNER_TEMP/output/App.ipa \
             -t ios \
+            --apple-id 6759450478 \
+            --bundle-id com.loteclick.app \
             --apiKey ${{ secrets.APPLE_KEY_ID }} \
             --apiIssuer ${{ secrets.APPLE_ISSUER_ID }}
