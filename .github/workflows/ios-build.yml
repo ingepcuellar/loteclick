@@ -62,9 +62,15 @@ jobs:
             -scheme App \
             -sdk iphoneos \
             -configuration Release \
+            -destination "generic/platform=iOS" \
             -archivePath $RUNNER_TEMP/App.xcarchive \
             DEVELOPMENT_TEAM=C59HC2JBRC \
             CODE_SIGN_STYLE=Automatic \
+            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.APPLE_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APPLE_ISSUER_ID }} \
+            -allowProvisioningUpdates \
+            archive
 
       - name: Export IPA
         run: |
