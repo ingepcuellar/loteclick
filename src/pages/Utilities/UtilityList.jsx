@@ -208,126 +208,185 @@ function UtilityList() {
                             </Link>
                         </div>
                     ) : (
-                        <div className="table-responsive">
-                            <table className="table">
-                                <thead>
-                                    <tr>
-                                        <th>Cliente</th>
-                                        <th>Lote</th>
-                                        <th>Servicio</th>
-                                        <th>Fecha Cobro</th>
-                                        <th style={{ textAlign: 'right' }}>Monto</th>
-                                        <th style={{ textAlign: 'center' }}>Estado</th>
-                                        <th style={{ textAlign: 'center' }}>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filtered.map(reg => {
-                                        const serviceType = SERVICE_TYPES[reg.serviceType || reg.service_type] || SERVICE_TYPES.water;
-                                        const statusConfig = STATUS_CONFIG[reg.status] || STATUS_CONFIG.pending;
-                                        const ServiceIcon = serviceType.icon;
-                                        const StatusIcon = statusConfig.icon;
+                        <>
+                            <div className="table-responsive">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Cliente</th>
+                                            <th>Lote</th>
+                                            <th>Servicio</th>
+                                            <th>Fecha Cobro</th>
+                                            <th style={{ textAlign: 'right' }}>Monto</th>
+                                            <th style={{ textAlign: 'center' }}>Estado</th>
+                                            <th style={{ textAlign: 'center' }}>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filtered.map(reg => {
+                                            const serviceType = SERVICE_TYPES[reg.serviceType || reg.service_type] || SERVICE_TYPES.water;
+                                            const statusConfig = STATUS_CONFIG[reg.status] || STATUS_CONFIG.pending;
+                                            const ServiceIcon = serviceType.icon;
+                                            const StatusIcon = statusConfig.icon;
 
-                                        return (
-                                            <tr key={reg.id}>
-                                                <td>
-                                                    <div style={{ fontWeight: 500 }}>{reg.client?.name || 'Sin cliente'}</div>
-                                                    {reg.project?.name && (
-                                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                                            {reg.project.name}
+                                            return (
+                                                <tr key={reg.id}>
+                                                    <td>
+                                                        <div style={{ fontWeight: 500 }}>{reg.client?.name || 'Sin cliente'}</div>
+                                                        {reg.project?.name && (
+                                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                                {reg.project.name}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <span style={{ fontWeight: 500 }}>
+                                                            Lote #{reg.lot?.number || '—'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span
+                                                            className="badge"
+                                                            style={{
+                                                                background: `${serviceType.color}20`,
+                                                                color: serviceType.color,
+                                                                border: `1px solid ${serviceType.color}40`,
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}
+                                                        >
+                                                            <ServiceIcon style={{ marginRight: '4px' }} />
+                                                            {serviceType.label}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
+                                                            <FiCalendar />
+                                                            {formatDate(reg.chargeDate || reg.charge_date)}
                                                         </div>
-                                                    )}
-                                                </td>
-                                                <td>
-                                                    <span style={{ fontWeight: 500 }}>
-                                                        Lote #{reg.lot?.number || '—'}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        className="badge"
-                                                        style={{
-                                                            background: `${serviceType.color}20`,
-                                                            color: serviceType.color,
-                                                            border: `1px solid ${serviceType.color}40`,
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '4px'
-                                                        }}
-                                                    >
+                                                    </td>
+                                                    <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                                                        {formatCurrency(reg.amount)}
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <span
+                                                            className="badge"
+                                                            style={{
+                                                                background: `${statusConfig.color}20`,
+                                                                color: statusConfig.color,
+                                                                border: `1px solid ${statusConfig.color}40`,
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}
+                                                        >
+                                                            <StatusIcon />
+                                                            {statusConfig.label}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                            {reg.status === 'pending' && (
+                                                                <button
+                                                                    className="btn btn-sm btn-primary"
+                                                                    onClick={() => handleMarkAsPaid(reg)}
+                                                                    title="Marcar como pagado"
+                                                                >
+                                                                    <FiCheckCircle />
+                                                                </button>
+                                                            )}
+                                                            <Link
+                                                                to={`/utilities/${reg.id}/edit`}
+                                                                className="btn btn-sm btn-secondary"
+                                                                title="Editar"
+                                                            >
+                                                                <FiEdit2 />
+                                                            </Link>
+                                                            <button
+                                                                className="btn btn-sm btn-danger"
+                                                                onClick={() => setDeleteConfirm(reg.id)}
+                                                                title="Eliminar"
+                                                            >
+                                                                <FiTrash2 />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colSpan="4" style={{ textAlign: 'right', fontWeight: 600 }}>
+                                                Total:
+                                            </td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '1.1rem' }}>
+                                                {formatCurrency(filtered.reduce((sum, u) => sum + parseFloat(u.amount || 0), 0))}
+                                            </td>
+                                            <td colSpan="2"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            {/* Mobile Card View */}
+                            <div className="mobile-card-list">
+                                {filtered.map(reg => {
+                                    const serviceType = SERVICE_TYPES[reg.serviceType || reg.service_type] || SERVICE_TYPES.water;
+                                    const statusConfig = STATUS_CONFIG[reg.status] || STATUS_CONFIG.pending;
+                                    const ServiceIcon = serviceType.icon;
+
+                                    return (
+                                        <Link to={`/utilities/${reg.id}/edit`} key={reg.id} className="mobile-card-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                            <div className="mobile-card-header">
+                                                <div>
+                                                    <div className="mobile-card-title">{reg.client?.name || 'Sin cliente'}</div>
+                                                    <div className="mobile-card-subtitle">Lote #{reg.lot?.number || '—'} · {reg.project?.name || ''}</div>
+                                                </div>
+                                                <span style={{ fontWeight: 700 }}>
+                                                    {formatCurrency(reg.amount)}
+                                                </span>
+                                            </div>
+                                            <div className="mobile-card-body">
+                                                <div className="mobile-card-row">
+                                                    <span className="mobile-card-label">Servicio</span>
+                                                    <span className="badge" style={{
+                                                        background: `${serviceType.color}20`,
+                                                        color: serviceType.color,
+                                                        border: `1px solid ${serviceType.color}40`,
+                                                        fontSize: 'var(--font-size-xs)'
+                                                    }}>
                                                         <ServiceIcon style={{ marginRight: '4px' }} />
                                                         {serviceType.label}
                                                     </span>
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                                                        <FiCalendar />
-                                                        {formatDate(reg.chargeDate || reg.charge_date)}
-                                                    </div>
-                                                </td>
-                                                <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                                                    {formatCurrency(reg.amount)}
-                                                </td>
-                                                <td style={{ textAlign: 'center' }}>
-                                                    <span
-                                                        className="badge"
-                                                        style={{
-                                                            background: `${statusConfig.color}20`,
-                                                            color: statusConfig.color,
-                                                            border: `1px solid ${statusConfig.color}40`,
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '4px'
-                                                        }}
-                                                    >
-                                                        <StatusIcon />
+                                                </div>
+                                                <div className="mobile-card-row">
+                                                    <span className="mobile-card-label">Fecha Cobro</span>
+                                                    <span className="mobile-card-value">{formatDate(reg.chargeDate || reg.charge_date)}</span>
+                                                </div>
+                                                <div className="mobile-card-row">
+                                                    <span className="mobile-card-label">Estado</span>
+                                                    <span className="badge" style={{
+                                                        background: `${statusConfig.color}20`,
+                                                        color: statusConfig.color,
+                                                        border: `1px solid ${statusConfig.color}40`,
+                                                        fontSize: 'var(--font-size-xs)'
+                                                    }}>
                                                         {statusConfig.label}
                                                     </span>
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                        {reg.status === 'pending' && (
-                                                            <button
-                                                                className="btn btn-sm btn-primary"
-                                                                onClick={() => handleMarkAsPaid(reg)}
-                                                                title="Marcar como pagado"
-                                                            >
-                                                                <FiCheckCircle />
-                                                            </button>
-                                                        )}
-                                                        <Link
-                                                            to={`/utilities/${reg.id}/edit`}
-                                                            className="btn btn-sm btn-secondary"
-                                                            title="Editar"
-                                                        >
-                                                            <FiEdit2 />
-                                                        </Link>
-                                                        <button
-                                                            className="btn btn-sm btn-danger"
-                                                            onClick={() => setDeleteConfirm(reg.id)}
-                                                            title="Eliminar"
-                                                        >
-                                                            <FiTrash2 />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colSpan="4" style={{ textAlign: 'right', fontWeight: 600 }}>
-                                            Total:
-                                        </td>
-                                        <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '1.1rem' }}>
-                                            {formatCurrency(filtered.reduce((sum, u) => sum + parseFloat(u.amount || 0), 0))}
-                                        </td>
-                                        <td colSpan="2"></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                                {filtered.length > 0 && (
+                                    <div className="mobile-card-item" style={{ textAlign: 'right', fontWeight: 700, fontSize: '1.1rem' }}>
+                                        Total: {formatCurrency(filtered.reduce((sum, u) => sum + parseFloat(u.amount || 0), 0))}
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

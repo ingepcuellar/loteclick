@@ -1829,10 +1829,118 @@ a:hover {
 }
 
 /* ============================================
+   Mobile Card List Component
+   ============================================ */
+
+.mobile-card-list {
+  display: none;
+}
+
+.mobile-card-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  backdrop-filter: blur(10px);
+}
+
+.mobile-card-item:active {
+  background: var(--bg-tertiary);
+}
+
+.mobile-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-3);
+}
+
+.mobile-card-title {
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+}
+
+.mobile-card-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.mobile-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.mobile-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+}
+
+.mobile-card-label {
+  color: var(--text-muted);
+}
+
+.mobile-card-value {
+  color: var(--text-primary);
+  font-weight: 500;
+  text-align: right;
+}
+
+.mobile-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--spacing-3);
+  padding-top: var(--spacing-3);
+  border-top: 1px solid var(--border-color);
+}
+
+.mobile-card-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.mobile-card-avatar {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-accent-500));
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  flex-shrink: 0;
+}
+
+.mobile-card-main {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+/* ============================================
    Responsive Breakpoints — Mobile (≤ 768px)
    ============================================ */
 
 @media (max-width: 768px) {
+
+  /* Show mobile cards, hide desktop tables */
+  .mobile-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+  }
+
+  .table-container,
+  .table-responsive {
+    display: none !important;
+  }
 
   /* --- Sidebar: slide-in drawer --- */
   .sidebar {

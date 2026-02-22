@@ -236,6 +236,48 @@ function SalesList() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Mobile Card View */}
+                    <div className="mobile-card-list">
+                        {filteredSales.map(sale => {
+                            const client = state.clients.find(c => c.id === sale.clientId);
+                            const project = state.projects.find(p => p.id === sale.projectId);
+                            const payments = getPaymentsBySale(sale.id);
+                            const paid = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+                            const status = getSaleStatus(sale);
+
+                            return (
+                                <Link to={`/sales/${sale.id}`} key={sale.id} className="mobile-card-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                    <div className="mobile-card-header">
+                                        <div className="mobile-card-main">
+                                            <div className="mobile-card-avatar">
+                                                {(client?.name || client?.fullName)?.charAt(0).toUpperCase() || '?'}
+                                            </div>
+                                            <div>
+                                                <div className="mobile-card-title">{client?.name || client?.fullName || '-'}</div>
+                                                <div className="mobile-card-subtitle">{project?.name || '-'} · Lote {sale.lotNumber}</div>
+                                            </div>
+                                        </div>
+                                        <span className={`badge ${status.class}`}>{status.label}</span>
+                                    </div>
+                                    <div className="mobile-card-body">
+                                        <div className="mobile-card-row">
+                                            <span className="mobile-card-label">Precio</span>
+                                            <span className="mobile-card-value">{formatCurrency(sale.totalPrice)}</span>
+                                        </div>
+                                        <div className="mobile-card-row">
+                                            <span className="mobile-card-label">Pagado</span>
+                                            <span className="mobile-card-value" style={{ color: 'var(--color-success)' }}>{formatCurrency(paid)}</span>
+                                        </div>
+                                        <div className="mobile-card-row">
+                                            <span className="mobile-card-label">Fecha</span>
+                                            <span className="mobile-card-value">{formatDate(sale.saleDate || sale.sale_date || sale.created_at)}</span>
+                                        </div>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
         </div>

@@ -176,6 +176,45 @@ function ClientList() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Mobile Card View */}
+                    <div className="mobile-card-list">
+                        {filteredClients.map(client => {
+                            const clientSales = getSalesByClient(client.id);
+                            return (
+                                <Link to={`/clients/${client.id}`} key={client.id} className="mobile-card-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                    <div className="mobile-card-header">
+                                        <div className="mobile-card-main">
+                                            <div className="mobile-card-avatar">
+                                                {(client.name || client.fullName)?.charAt(0).toUpperCase() || '?'}
+                                            </div>
+                                            <div>
+                                                <div className="mobile-card-title">{client.name || client.fullName}</div>
+                                                <div className="mobile-card-subtitle">{client.document || 'Sin documento'}</div>
+                                            </div>
+                                        </div>
+                                        <span className={`badge ${clientSales.length > 0 ? 'badge-success' : 'badge-neutral'}`}>
+                                            {clientSales.length} compra{clientSales.length !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                    <div className="mobile-card-body">
+                                        {client.phone && (
+                                            <div className="mobile-card-row">
+                                                <span className="mobile-card-label"><FiPhone size={12} style={{ marginRight: 4 }} />Teléfono</span>
+                                                <span className="mobile-card-value">{client.phone}</span>
+                                            </div>
+                                        )}
+                                        {client.email && (
+                                            <div className="mobile-card-row">
+                                                <span className="mobile-card-label"><FiMail size={12} style={{ marginRight: 4 }} />Email</span>
+                                                <span className="mobile-card-value">{client.email}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
         </div>

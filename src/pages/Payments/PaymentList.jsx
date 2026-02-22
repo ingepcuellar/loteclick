@@ -256,6 +256,44 @@ function PaymentList() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Mobile Card View */}
+                    <div className="mobile-card-list">
+                        {filteredPayments.map(payment => {
+                            const sale = getSaleById(payment.saleId);
+                            const client = sale ? getClientById(sale.clientId) : null;
+                            const project = sale ? getProjectById(sale.projectId) : null;
+
+                            return (
+                                <Link to={`/sales/${payment.saleId}`} key={payment.id} className="mobile-card-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                    <div className="mobile-card-header">
+                                        <div className="mobile-card-main">
+                                            <div className="mobile-card-avatar">
+                                                {(client?.name || client?.fullName)?.charAt(0).toUpperCase() || '?'}
+                                            </div>
+                                            <div>
+                                                <div className="mobile-card-title">{client?.name || client?.fullName || '-'}</div>
+                                                <div className="mobile-card-subtitle">{project?.name || '-'} · Lote {sale?.lotNumber || '-'}</div>
+                                            </div>
+                                        </div>
+                                        <span className="mobile-card-value" style={{ color: 'var(--color-success)', fontSize: 'var(--font-size-base)', fontWeight: 700 }}>
+                                            {formatCurrency(payment.amount)}
+                                        </span>
+                                    </div>
+                                    <div className="mobile-card-body">
+                                        <div className="mobile-card-row">
+                                            <span className="mobile-card-label">Fecha</span>
+                                            <span className="mobile-card-value">{formatDate(payment.paymentDate || payment.createdAt)}</span>
+                                        </div>
+                                        <div className="mobile-card-row">
+                                            <span className="mobile-card-label">Recibo</span>
+                                            <span className="mobile-card-value">{payment.receiptImage ? '✓ Con recibo' : 'Sin recibo'}</span>
+                                        </div>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
         </div>

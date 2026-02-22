@@ -167,98 +167,149 @@ function UserList() {
                             </Link>
                         </div>
                     ) : (
-                        <div className="table-responsive">
-                            <table className="table">
-                                <thead>
-                                    <tr>
-                                        <th>Usuario</th>
-                                        <th>Rol</th>
-                                        <th>Estado</th>
-                                        <th style={{ textAlign: 'center' }}>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredUsers.map(user => {
-                                        const roleColor = ROLE_COLORS[user.role] || ROLE_COLORS.seller;
-                                        const isDefaultAdmin = user.email === 'admin@loteclick.com';
+                        <>
+                            <div className="table-responsive">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Usuario</th>
+                                            <th>Rol</th>
+                                            <th>Estado</th>
+                                            <th style={{ textAlign: 'center' }}>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredUsers.map(user => {
+                                            const roleColor = ROLE_COLORS[user.role] || ROLE_COLORS.seller;
+                                            const isDefaultAdmin = user.email === 'admin@loteclick.com';
 
-                                        return (
-                                            <tr key={user.id}>
-                                                <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                        <div style={{
-                                                            width: '40px',
-                                                            height: '40px',
-                                                            borderRadius: '50%',
-                                                            background: `linear-gradient(135deg, ${roleColor.color}, ${roleColor.color}80)`,
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            color: 'white',
-                                                            fontWeight: 600,
-                                                            fontSize: '1rem'
-                                                        }}>
-                                                            {user.name?.charAt(0).toUpperCase() || 'U'}
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontWeight: 500 }}>{user.name}</div>
-                                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                                <FiMail size={12} />
-                                                                {user.email}
+                                            return (
+                                                <tr key={user.id}>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                            <div style={{
+                                                                width: '40px',
+                                                                height: '40px',
+                                                                borderRadius: '50%',
+                                                                background: `linear-gradient(135deg, ${roleColor.color}, ${roleColor.color}80)`,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                color: 'white',
+                                                                fontWeight: 600,
+                                                                fontSize: '1rem'
+                                                            }}>
+                                                                {user.name?.charAt(0).toUpperCase() || 'U'}
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontWeight: 500 }}>{user.name}</div>
+                                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                                    <FiMail size={12} />
+                                                                    {user.email}
+                                                                </div>
                                                             </div>
                                                         </div>
+                                                    </td>
+                                                    <td>
+                                                        <span
+                                                            className="badge"
+                                                            style={{
+                                                                background: roleColor.bg,
+                                                                color: roleColor.color,
+                                                                border: `1px solid ${roleColor.border}`
+                                                            }}
+                                                        >
+                                                            <FiShield style={{ marginRight: '4px' }} />
+                                                            {ROLE_LABELS[user.role] || user.role}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        {user.isActive ? (
+                                                            <span className="badge" style={{ background: '#10b98120', color: '#10b981' }}>
+                                                                <FiCheck /> Activo
+                                                            </span>
+                                                        ) : (
+                                                            <span className="badge" style={{ background: '#ef444420', color: '#ef4444' }}>
+                                                                <FiX /> Inactivo
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                            <Link
+                                                                to={`/users/${user.id}/edit`}
+                                                                className="btn btn-sm btn-secondary"
+                                                                title="Editar"
+                                                            >
+                                                                <FiEdit2 />
+                                                            </Link>
+                                                            <button
+                                                                className="btn btn-sm btn-danger"
+                                                                onClick={() => setDeleteConfirm(user.id)}
+                                                                title="Eliminar"
+                                                                disabled={isDefaultAdmin}
+                                                                style={isDefaultAdmin ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                                                            >
+                                                                <FiTrash2 />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile Card View */}
+                            <div className="mobile-card-list">
+                                {filteredUsers.map(user => {
+                                    const roleColor = ROLE_COLORS[user.role] || ROLE_COLORS.seller;
+                                    const isDefaultAdmin = user.email === 'admin@loteclick.com';
+
+                                    return (
+                                        <Link to={`/users/${user.id}/edit`} key={user.id} className="mobile-card-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                            <div className="mobile-card-header">
+                                                <div className="mobile-card-main">
+                                                    <div className="mobile-card-avatar" style={{
+                                                        background: `linear-gradient(135deg, ${roleColor.color}, ${roleColor.color}80)`
+                                                    }}>
+                                                        {user.name?.charAt(0).toUpperCase() || 'U'}
                                                     </div>
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        className="badge"
-                                                        style={{
-                                                            background: roleColor.bg,
-                                                            color: roleColor.color,
-                                                            border: `1px solid ${roleColor.border}`
-                                                        }}
-                                                    >
+                                                    <div>
+                                                        <div className="mobile-card-title">{user.name}</div>
+                                                        <div className="mobile-card-subtitle">{user.email}</div>
+                                                    </div>
+                                                </div>
+                                                {user.isActive ? (
+                                                    <span className="badge" style={{ background: '#10b98120', color: '#10b981', fontSize: 'var(--font-size-xs)' }}>
+                                                        <FiCheck /> Activo
+                                                    </span>
+                                                ) : (
+                                                    <span className="badge" style={{ background: '#ef444420', color: '#ef4444', fontSize: 'var(--font-size-xs)' }}>
+                                                        <FiX /> Inactivo
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="mobile-card-body">
+                                                <div className="mobile-card-row">
+                                                    <span className="mobile-card-label">Rol</span>
+                                                    <span className="badge" style={{
+                                                        background: roleColor.bg,
+                                                        color: roleColor.color,
+                                                        border: `1px solid ${roleColor.border}`,
+                                                        fontSize: 'var(--font-size-xs)'
+                                                    }}>
                                                         <FiShield style={{ marginRight: '4px' }} />
                                                         {ROLE_LABELS[user.role] || user.role}
                                                     </span>
-                                                </td>
-                                                <td>
-                                                    {user.isActive ? (
-                                                        <span className="badge" style={{ background: '#10b98120', color: '#10b981' }}>
-                                                            <FiCheck /> Activo
-                                                        </span>
-                                                    ) : (
-                                                        <span className="badge" style={{ background: '#ef444420', color: '#ef4444' }}>
-                                                            <FiX /> Inactivo
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                        <Link
-                                                            to={`/users/${user.id}/edit`}
-                                                            className="btn btn-sm btn-secondary"
-                                                            title="Editar"
-                                                        >
-                                                            <FiEdit2 />
-                                                        </Link>
-                                                        <button
-                                                            className="btn btn-sm btn-danger"
-                                                            onClick={() => setDeleteConfirm(user.id)}
-                                                            title="Eliminar"
-                                                            disabled={isDefaultAdmin}
-                                                            style={isDefaultAdmin ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-                                                        >
-                                                            <FiTrash2 />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

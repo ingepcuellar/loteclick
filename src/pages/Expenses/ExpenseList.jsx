@@ -189,103 +189,149 @@ function ExpenseList() {
                             </Link>
                         </div>
                     ) : (
-                        <div className="table-responsive">
-                            <table className="table">
-                                <thead>
-                                    <tr>
-                                        <th>Descripción</th>
-                                        <th>Proyecto</th>
-                                        <th>Categoría</th>
-                                        <th>Fecha</th>
-                                        <th style={{ textAlign: 'right' }}>Monto</th>
-                                        <th style={{ textAlign: 'center' }}>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {totals.filtered.map(expense => {
-                                        const project = getProjectById(expense.projectId);
-                                        const category = EXPENSE_CATEGORIES[expense.category] || EXPENSE_CATEGORIES.other;
+                        <>
+                            <div className="table-responsive">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Descripción</th>
+                                            <th>Proyecto</th>
+                                            <th>Categoría</th>
+                                            <th>Fecha</th>
+                                            <th style={{ textAlign: 'right' }}>Monto</th>
+                                            <th style={{ textAlign: 'center' }}>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {totals.filtered.map(expense => {
+                                            const project = getProjectById(expense.projectId);
+                                            const category = EXPENSE_CATEGORIES[expense.category] || EXPENSE_CATEGORIES.other;
 
-                                        return (
-                                            <tr key={expense.id}>
-                                                <td>
-                                                    <div style={{ fontWeight: 500 }}>{expense.description}</div>
-                                                    {expense.notes && (
-                                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                                            {expense.notes.substring(0, 50)}...
+                                            return (
+                                                <tr key={expense.id}>
+                                                    <td>
+                                                        <div style={{ fontWeight: 500 }}>{expense.description}</div>
+                                                        {expense.notes && (
+                                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                                {expense.notes.substring(0, 50)}...
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            <FiFolder style={{ color: 'var(--primary-color)' }} />
+                                                            {project?.name || 'Sin proyecto'}
                                                         </div>
-                                                    )}
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                        <FiFolder style={{ color: 'var(--primary-color)' }} />
-                                                        {project?.name || 'Sin proyecto'}
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        className="badge"
-                                                        style={{
-                                                            background: `${category.color}20`,
-                                                            color: category.color,
-                                                            border: `1px solid ${category.color}40`
-                                                        }}
-                                                    >
-                                                        <FiTag style={{ marginRight: '4px' }} />
+                                                    </td>
+                                                    <td>
+                                                        <span
+                                                            className="badge"
+                                                            style={{
+                                                                background: `${category.color}20`,
+                                                                color: category.color,
+                                                                border: `1px solid ${category.color}40`
+                                                            }}
+                                                        >
+                                                            <FiTag style={{ marginRight: '4px' }} />
+                                                            {category.label}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
+                                                            <FiCalendar />
+                                                            {formatDate(expense.date || expense.createdAt)}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ textAlign: 'right', fontWeight: 600, color: '#ef4444' }}>
+                                                        {formatCurrency(expense.amount)}
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                            <Link
+                                                                to={`/expenses/${expense.id}`}
+                                                                className="btn btn-sm btn-secondary"
+                                                                title="Ver detalle"
+                                                            >
+                                                                <FiEye />
+                                                            </Link>
+                                                            <Link
+                                                                to={`/expenses/${expense.id}/edit`}
+                                                                className="btn btn-sm btn-secondary"
+                                                                title="Editar"
+                                                            >
+                                                                <FiEdit2 />
+                                                            </Link>
+                                                            <button
+                                                                className="btn btn-sm btn-danger"
+                                                                onClick={() => setDeleteConfirm(expense.id)}
+                                                                title="Eliminar"
+                                                            >
+                                                                <FiTrash2 />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colSpan="4" style={{ textAlign: 'right', fontWeight: 600 }}>
+                                                Total:
+                                            </td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, color: '#ef4444', fontSize: '1.1rem' }}>
+                                                {formatCurrency(totals.total)}
+                                            </td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            {/* Mobile Card View */}
+                            <div className="mobile-card-list">
+                                {totals.filtered.map(expense => {
+                                    const project = getProjectById(expense.projectId);
+                                    const category = EXPENSE_CATEGORIES[expense.category] || EXPENSE_CATEGORIES.other;
+
+                                    return (
+                                        <Link to={`/expenses/${expense.id}`} key={expense.id} className="mobile-card-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                            <div className="mobile-card-header">
+                                                <div>
+                                                    <div className="mobile-card-title">{expense.description}</div>
+                                                    <div className="mobile-card-subtitle">{project?.name || 'Sin proyecto'}</div>
+                                                </div>
+                                                <span style={{ fontWeight: 700, color: '#ef4444' }}>
+                                                    {formatCurrency(expense.amount)}
+                                                </span>
+                                            </div>
+                                            <div className="mobile-card-body">
+                                                <div className="mobile-card-row">
+                                                    <span className="mobile-card-label">Categoría</span>
+                                                    <span className="badge" style={{
+                                                        background: `${category.color}20`,
+                                                        color: category.color,
+                                                        border: `1px solid ${category.color}40`,
+                                                        fontSize: 'var(--font-size-xs)'
+                                                    }}>
                                                         {category.label}
                                                     </span>
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                                                        <FiCalendar />
-                                                        {formatDate(expense.date || expense.createdAt)}
-                                                    </div>
-                                                </td>
-                                                <td style={{ textAlign: 'right', fontWeight: 600, color: '#ef4444' }}>
-                                                    {formatCurrency(expense.amount)}
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                        <Link
-                                                            to={`/expenses/${expense.id}`}
-                                                            className="btn btn-sm btn-secondary"
-                                                            title="Ver detalle"
-                                                        >
-                                                            <FiEye />
-                                                        </Link>
-                                                        <Link
-                                                            to={`/expenses/${expense.id}/edit`}
-                                                            className="btn btn-sm btn-secondary"
-                                                            title="Editar"
-                                                        >
-                                                            <FiEdit2 />
-                                                        </Link>
-                                                        <button
-                                                            className="btn btn-sm btn-danger"
-                                                            onClick={() => setDeleteConfirm(expense.id)}
-                                                            title="Eliminar"
-                                                        >
-                                                            <FiTrash2 />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colSpan="4" style={{ textAlign: 'right', fontWeight: 600 }}>
-                                            Total:
-                                        </td>
-                                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#ef4444', fontSize: '1.1rem' }}>
-                                            {formatCurrency(totals.total)}
-                                        </td>
-                                        <td></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
+                                                </div>
+                                                <div className="mobile-card-row">
+                                                    <span className="mobile-card-label">Fecha</span>
+                                                    <span className="mobile-card-value">{formatDate(expense.date || expense.createdAt)}</span>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                                {totals.filtered.length > 0 && (
+                                    <div className="mobile-card-item" style={{ textAlign: 'right', fontWeight: 700, color: '#ef4444', fontSize: '1.1rem' }}>
+                                        Total: {formatCurrency(totals.total)}
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

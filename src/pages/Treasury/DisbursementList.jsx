@@ -129,62 +129,114 @@ function DisbursementList() {
                     </Link>
                 </div>
             ) : (
-                <div className="table-container">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Socio</th>
-                                <th>Proyecto</th>
-                                <th>Monto</th>
-                                <th>Comprobante</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredDisbursements.map(d => (
-                                <tr key={d.id}>
-                                    <td>
-                                        <FiCalendar style={{ marginRight: '0.5rem' }} />
-                                        {new Date(d.disbursement_date).toLocaleDateString('es-CO')}
-                                    </td>
-                                    <td>
-                                        <FiUser style={{ marginRight: '0.5rem' }} />
-                                        {d.partner?.name || 'N/A'}
-                                    </td>
-                                    <td>
-                                        <FiFolder style={{ marginRight: '0.5rem' }} />
-                                        {d.project?.name || 'N/A'}
-                                    </td>
-                                    <td style={{ fontWeight: 600, color: 'var(--primary)' }}>
-                                        {formatCurrency(d.amount)}
-                                    </td>
-                                    <td>
-                                        {(d.receipt_image || d.signature_image) ? (
-                                            <span className="badge badge-success">
-                                                <FiImage /> Sí
-                                            </span>
-                                        ) : (
-                                            <span className="badge badge-warning">Sin comprobante</span>
-                                        )}
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                            {(d.receipt_image || d.signature_image) && (
-                                                <a href={d.receipt_image || d.signature_image} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline">
-                                                    <FiEye />
-                                                </a>
-                                            )}
-                                            <button onClick={() => handleDelete(d.id)} className="btn btn-sm btn-danger">
-                                                <FiTrash2 />
-                                            </button>
-                                        </div>
-                                    </td>
+                <>
+                    <div className="table-container">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Socio</th>
+                                    <th>Proyecto</th>
+                                    <th>Monto</th>
+                                    <th>Comprobante</th>
+                                    <th>Acciones</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {filteredDisbursements.map(d => (
+                                    <tr key={d.id}>
+                                        <td>
+                                            <FiCalendar style={{ marginRight: '0.5rem' }} />
+                                            {new Date(d.disbursement_date).toLocaleDateString('es-CO')}
+                                        </td>
+                                        <td>
+                                            <FiUser style={{ marginRight: '0.5rem' }} />
+                                            {d.partner?.name || 'N/A'}
+                                        </td>
+                                        <td>
+                                            <FiFolder style={{ marginRight: '0.5rem' }} />
+                                            {d.project?.name || 'N/A'}
+                                        </td>
+                                        <td style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                                            {formatCurrency(d.amount)}
+                                        </td>
+                                        <td>
+                                            {(d.receipt_image || d.signature_image) ? (
+                                                <span className="badge badge-success">
+                                                    <FiImage /> Sí
+                                                </span>
+                                            ) : (
+                                                <span className="badge badge-warning">Sin comprobante</span>
+                                            )}
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                {(d.receipt_image || d.signature_image) && (
+                                                    <a href={d.receipt_image || d.signature_image} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline">
+                                                        <FiEye />
+                                                    </a>
+                                                )}
+                                                <button onClick={() => handleDelete(d.id)} className="btn btn-sm btn-danger">
+                                                    <FiTrash2 />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile Card View */}
+                    <div className="mobile-card-list">
+                        {filteredDisbursements.map(d => (
+                            <div key={d.id} className="mobile-card-item">
+                                <div className="mobile-card-header">
+                                    <div className="mobile-card-main">
+                                        <div className="mobile-card-avatar">
+                                            {(d.partner?.name)?.charAt(0).toUpperCase() || 'S'}
+                                        </div>
+                                        <div>
+                                            <div className="mobile-card-title">{d.partner?.name || 'N/A'}</div>
+                                            <div className="mobile-card-subtitle">{d.project?.name || 'N/A'}</div>
+                                        </div>
+                                    </div>
+                                    <span style={{ fontWeight: 700, color: 'var(--color-primary-400)' }}>
+                                        {formatCurrency(d.amount)}
+                                    </span>
+                                </div>
+                                <div className="mobile-card-body">
+                                    <div className="mobile-card-row">
+                                        <span className="mobile-card-label">Fecha</span>
+                                        <span className="mobile-card-value">{new Date(d.disbursement_date).toLocaleDateString('es-CO')}</span>
+                                    </div>
+                                    <div className="mobile-card-row">
+                                        <span className="mobile-card-label">Comprobante</span>
+                                        <span className="mobile-card-value">
+                                            {(d.receipt_image || d.signature_image) ? (
+                                                <span className="badge badge-success" style={{ fontSize: 'var(--font-size-xs)' }}>
+                                                    <FiImage /> Sí
+                                                </span>
+                                            ) : (
+                                                <span className="badge badge-warning" style={{ fontSize: 'var(--font-size-xs)' }}>Sin comprobante</span>
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'var(--spacing-3)' }}>
+                                    {(d.receipt_image || d.signature_image) && (
+                                        <a href={d.receipt_image || d.signature_image} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline" style={{ flex: 1 }}>
+                                            <FiEye /> Ver
+                                        </a>
+                                    )}
+                                    <button onClick={() => handleDelete(d.id)} className="btn btn-sm btn-danger" style={{ flex: 1 }}>
+                                        <FiTrash2 /> Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </>
             )}
         </div>
     );
