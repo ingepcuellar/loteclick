@@ -121,6 +121,8 @@ html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  background-color: var(--bg-primary);
+  overscroll-behavior: none;
 }
 
 body {
