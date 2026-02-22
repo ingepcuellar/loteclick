@@ -91,7 +91,7 @@ jobs:
             -t ios \
             --apple-id 6759450478 \
             --bundle-id com.loteclick.app \
-            --bundle-version 2 \
+            --bundle-version 3 \
             --bundle-short-version-string 1.0.0 \
             --apiKey ${{ secrets.APPLE_KEY_ID }} \
             --apiIssuer ${{ secrets.APPLE_ISSUER_ID }}
