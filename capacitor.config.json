@@ -9,6 +9,14 @@
     "ios": {
         "contentInset": "automatic",
         "preferredContentMode": "mobile",
-        "scheme": "LoteClick"
+        "scheme": "LoteClick",
+        "scrollEnabled": true,
+        "allowsLinkPreview": false
+    },
+    "plugins": {
+        "Keyboard": {
+            "resize": "body",
+            "resizeOnFullScreen": true
+        }
     }
 }
