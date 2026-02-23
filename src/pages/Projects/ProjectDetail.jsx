@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
     FiEdit2,
@@ -11,6 +12,8 @@ import {
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { formatCurrency } from '../../lib/formatters';
+import ConfirmModal from '../../components/ui/ConfirmModal';
 
 function ProjectDetail() {
     const { id } = useParams();
@@ -35,20 +38,18 @@ function ProjectDetail() {
         );
     }
 
+    const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
     const handleDelete = () => {
-        if (window.confirm(`¿Estás seguro de eliminar el proyecto "${project.name}"?`)) {
-            deleteProject(id);
-            navigate('/projects');
-        }
+        setShowConfirmDelete(true);
     };
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount);
+    const executeDelete = () => {
+        deleteProject(id);
+        navigate('/projects');
     };
+
+
 
     // Stats
     const totalLots = project.lots?.length || 0;
@@ -349,6 +350,16 @@ function ProjectDetail() {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={showConfirmDelete}
+                title={`¿Eliminar proyecto "${project.name}"?`}
+                message="Esta acción no se puede deshacer."
+                confirmText="Eliminar"
+                variant="danger"
+                onConfirm={executeDelete}
+                onCancel={() => setShowConfirmDelete(false)}
+            />
         </div>
     );
 }

@@ -15,6 +15,7 @@ import {
     FiTrash2
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { formatCurrency } from '../../lib/formatters';
 import { commissionAgentService } from '../../services/commissionAgentService';
 import { generatePaymentSlipHTML, openPrintWindow, writeToPrintWindow } from '../../lib/barcodeUtils';
 
@@ -184,14 +185,7 @@ function SaleForm() {
         ));
     };
 
-    const formatCurrency = (value) => {
-        const num = parseFloat(value) || 0;
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(num);
-    };
+
 
     const validate = () => {
         const newErrors = {};

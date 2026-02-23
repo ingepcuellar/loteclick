@@ -14,6 +14,8 @@ import {
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { disbursementService } from '../../services/disbursementService';
+import { formatCurrency } from '../../lib/formatters';
+import ConfirmModal from '../../components/ui/ConfirmModal';
 
 function DisbursementList() {
     const navigate = useNavigate();
@@ -37,17 +39,21 @@ function DisbursementList() {
         setLoading(false);
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('¿Estás seguro de eliminar esta entrega?')) return;
-        const { error } = await disbursementService.delete(id);
-        if (!error) {
-            setDisbursements(prev => prev.filter(d => d.id !== id));
-        }
+    const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+    const handleDelete = (id) => {
+        setConfirmDeleteId(id);
     };
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount || 0);
+    const executeDelete = async () => {
+        const { error } = await disbursementService.delete(confirmDeleteId);
+        if (!error) {
+            setDisbursements(prev => prev.filter(d => d.id !== confirmDeleteId));
+        }
+        setConfirmDeleteId(null);
     };
+
+
 
     const filteredDisbursements = disbursements.filter(d => {
         const matchesSearch = !searchTerm ||
@@ -238,6 +244,15 @@ function DisbursementList() {
                     </div>
                 </>
             )}
+            <ConfirmModal
+                isOpen={!!confirmDeleteId}
+                title="¿Eliminar esta entrega?"
+                message="Esta acción no se puede deshacer."
+                confirmText="Eliminar"
+                variant="danger"
+                onConfirm={executeDelete}
+                onCancel={() => setConfirmDeleteId(null)}
+            />
         </div>
     );
 }

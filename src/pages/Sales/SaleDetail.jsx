@@ -16,6 +16,8 @@ import {
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { generatePaymentSlipHTML, printDocument } from '../../lib/barcodeUtils';
+import { formatCurrency, formatDateLong as formatDate } from '../../lib/formatters';
+import ConfirmModal from '../../components/ui/ConfirmModal';
 
 function SaleDetail() {
     const { id } = useParams();
@@ -58,28 +60,17 @@ function SaleDetail() {
         );
     }
 
+    const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
     const handleDelete = () => {
-        if (window.confirm('¿Estás seguro de eliminar esta venta? El lote volverá a estar disponible.')) {
-            deleteSale(id);
-            navigate('/sales');
-        }
+        setShowConfirmDelete(true);
     };
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount);
+    const executeDelete = () => {
+        deleteSale(id);
+        navigate('/sales');
     };
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('es-CO', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
-    };
 
     const progressPercentage = (totalPaid / parseFloat(sale.totalPrice)) * 100;
     const isPaid = pendingAmount <= 0;
@@ -663,6 +654,16 @@ _________________________          _________________________
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={showConfirmDelete}
+                title="¿Eliminar esta venta?"
+                message="El lote volverá a estar disponible. Esta acción no se puede deshacer."
+                confirmText="Eliminar"
+                variant="danger"
+                onConfirm={executeDelete}
+                onCancel={() => setShowConfirmDelete(false)}
+            />
         </div>
     );
 }

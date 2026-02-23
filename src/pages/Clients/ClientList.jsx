@@ -2,10 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiPlus, FiUsers, FiSearch, FiEdit2, FiTrash2, FiEye, FiPhone, FiMail } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import ConfirmModal from '../../components/ui/ConfirmModal';
+import PageHeader from '../../components/ui/PageHeader';
+import EmptyState from '../../components/ui/EmptyState';
 
 function ClientList() {
     const { state, deleteClient, getSalesByClient } = useApp();
     const [searchTerm, setSearchTerm] = useState('');
+    const [confirmDelete, setConfirmDelete] = useState(null);
 
     const handleDelete = (clientId, clientName) => {
         const clientSales = getSalesByClient(clientId);
@@ -13,8 +17,13 @@ function ClientList() {
             alert(`No se puede eliminar el cliente "${clientName}" porque tiene ${clientSales.length} venta(s) asociada(s).`);
             return;
         }
-        if (window.confirm(`¿Estás seguro de eliminar el cliente "${clientName}"?`)) {
-            deleteClient(clientId);
+        setConfirmDelete({ id: clientId, name: clientName });
+    };
+
+    const executeDelete = () => {
+        if (confirmDelete) {
+            deleteClient(confirmDelete.id);
+            setConfirmDelete(null);
         }
     };
 
@@ -28,18 +37,15 @@ function ClientList() {
     return (
         <div className="animate-fadeIn">
             {/* Page Header */}
-            <div className="page-header">
-                <div className="page-header-content">
-                    <h1>Clientes</h1>
-                    <p>Gestiona la información de tus clientes</p>
-                </div>
-                <div className="page-header-actions">
+            <PageHeader
+                title="Clientes"
+                subtitle="Gestiona la información de tus clientes"
+                actions={
                     <Link to="/clients/new" className="btn btn-primary">
-                        <FiPlus />
-                        Nuevo Cliente
+                        <FiPlus /> Nuevo Cliente
                     </Link>
-                </div>
-            </div>
+                }
+            />
 
             {/* Search Bar */}
             <div className="card mb-6">
@@ -67,27 +73,21 @@ function ClientList() {
             {/* Clients Table */}
             {state.clients.length === 0 ? (
                 <div className="card">
-                    <div className="empty-state">
-                        <div className="empty-state-icon">
-                            <FiUsers />
-                        </div>
-                        <h3>No hay clientes</h3>
-                        <p>Registra tu primer cliente para comenzar</p>
-                        <Link to="/clients/new" className="btn btn-primary">
-                            <FiPlus />
-                            Nuevo Cliente
-                        </Link>
-                    </div>
+                    <EmptyState
+                        icon={FiUsers}
+                        title="No hay clientes"
+                        description="Registra tu primer cliente para comenzar"
+                        actionLabel="Nuevo Cliente"
+                        actionTo="/clients/new"
+                    />
                 </div>
             ) : filteredClients.length === 0 ? (
                 <div className="card">
-                    <div className="empty-state">
-                        <div className="empty-state-icon">
-                            <FiSearch />
-                        </div>
-                        <h3>Sin resultados</h3>
-                        <p>No se encontraron clientes que coincidan con "{searchTerm}"</p>
-                    </div>
+                    <EmptyState
+                        icon={FiSearch}
+                        title="Sin resultados"
+                        description={`No se encontraron clientes que coincidan con "${searchTerm}"`}
+                    />
                 </div>
             ) : (
                 <div className="card">
@@ -217,6 +217,16 @@ function ClientList() {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={!!confirmDelete}
+                title={`¿Eliminar cliente "${confirmDelete?.name}"?`}
+                message="Esta acción no se puede deshacer."
+                confirmText="Eliminar"
+                variant="danger"
+                onConfirm={executeDelete}
+                onCancel={() => setConfirmDelete(null)}
+            />
         </div>
     );
 }

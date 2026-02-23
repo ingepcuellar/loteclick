@@ -21,6 +21,10 @@ define('JWT_EXPIRY', 86400 * 7); // 7 days
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
 define('MAX_FILE_SIZE', 5 * 1024 * 1024); // 5MB
 
+// Firebase Cloud Messaging (Push Notifications)
+// Place the Firebase service account JSON file in this directory
+define('FCM_SERVICE_ACCOUNT_PATH', __DIR__ . '/firebase-service-account.json');
+
 // CORS Headers
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');

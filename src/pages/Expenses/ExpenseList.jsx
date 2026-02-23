@@ -13,6 +13,9 @@ import {
     FiTag
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { formatCurrency, formatDate } from '../../lib/formatters';
+import PageHeader from '../../components/ui/PageHeader';
+import EmptyState from '../../components/ui/EmptyState';
 
 const EXPENSE_CATEGORIES = {
     commissions: { label: 'Comisiones', color: '#f97316' },
@@ -65,34 +68,20 @@ function ExpenseList() {
         setDeleteConfirm(null);
     };
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0
-        }).format(amount);
-    };
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
-    };
 
     return (
         <div className="page-container">
             {/* Header */}
-            <div className="page-header">
-                <div className="page-header-content">
-                    <h1>Gastos</h1>
-                    <p>Gestiona los gastos de tus proyectos</p>
-                </div>
-                <Link to="/expenses/new" className="btn btn-primary">
-                    <FiPlus /> Nuevo Gasto
-                </Link>
-            </div>
+            <PageHeader
+                title="Gastos"
+                subtitle="Gestiona los gastos de tus proyectos"
+                actions={
+                    <Link to="/expenses/new" className="btn btn-primary">
+                        <FiPlus /> Nuevo Gasto
+                    </Link>
+                }
+            />
 
             {/* Stats Cards */}
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '1.5rem' }}>
@@ -180,14 +169,13 @@ function ExpenseList() {
             <div className="card">
                 <div className="card-body" style={{ padding: 0 }}>
                     {totals.filtered.length === 0 ? (
-                        <div className="empty-state">
-                            <FiDollarSign className="empty-state-icon" />
-                            <h3>No hay gastos registrados</h3>
-                            <p>Comienza agregando el primer gasto de tu proyecto</p>
-                            <Link to="/expenses/new" className="btn btn-primary">
-                                <FiPlus /> Nuevo Gasto
-                            </Link>
-                        </div>
+                        <EmptyState
+                            icon={FiDollarSign}
+                            title="No hay gastos registrados"
+                            description="Comienza agregando el primer gasto de tu proyecto"
+                            actionLabel="Nuevo Gasto"
+                            actionTo="/expenses/new"
+                        />
                     ) : (
                         <>
                             <div className="table-responsive">

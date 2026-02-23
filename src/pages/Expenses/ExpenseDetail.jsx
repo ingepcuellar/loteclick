@@ -13,6 +13,7 @@ import {
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { useState } from 'react';
+import { formatCurrency, formatDateLong as formatDate } from '../../lib/formatters';
 
 const EXPENSE_CATEGORIES = {
     commissions: { label: 'Comisiones', color: '#f97316' },
@@ -58,22 +59,7 @@ function ExpenseDetail() {
     const partner = project?.partners?.find(p => p.id === expense.partnerId);
     const category = EXPENSE_CATEGORIES[expense.category] || EXPENSE_CATEGORIES.other;
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0
-        }).format(amount);
-    };
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('es-CO', {
-            weekday: 'long',
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric'
-        });
-    };
 
     const handleDelete = () => {
         deleteExpense(id);

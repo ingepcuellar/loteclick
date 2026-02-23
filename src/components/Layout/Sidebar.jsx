@@ -22,7 +22,7 @@ import { notificationService } from '../../services/notificationService';
 function Sidebar({ isOpen, onClose }) {
     const location = useLocation();
     const { getStats } = useApp();
-    const { isAdmin, canAccessModule, state: authState } = useAuth();
+    const { isAdmin, isPartner, canAccessModule, state: authState } = useAuth();
     const stats = getStats();
     const [unreadCount, setUnreadCount] = useState(0);
 
@@ -53,7 +53,7 @@ function Sidebar({ isOpen, onClose }) {
         {
             section: 'Principal',
             items: [
-                { path: '/', icon: FiHome, label: 'Dashboard', module: 'dashboard' },
+                { path: isPartner() ? '/partner-dashboard' : '/', icon: FiHome, label: isPartner() ? 'Mi Dashboard' : 'Dashboard', module: 'dashboard' },
             ]
         },
         {

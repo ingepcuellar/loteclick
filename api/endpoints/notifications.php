@@ -45,8 +45,37 @@ function getByPartner() {
     $pdo = getConnection();
     $partnerId = getParam('partnerId');
     if (!$partnerId) jsonError('partnerId requerido');
-    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 50");
-    $stmt->execute([$partnerId]);
+    
+    // Get the partner's name from the profiles table
+    $userStmt = $pdo->prepare("SELECT name FROM profiles WHERE id = ?");
+    $userStmt->execute([$partnerId]);
+    $user = $userStmt->fetch();
+    $partnerName = $user ? $user['name'] : '';
+    
+    // Fetch notifications for this partner:
+    // 1. recipient_id matches user ID directly
+    // 2. OR admin-type notifications (visible to all)
+    // 3. OR discount_request notifications where the sale's discount_partner_name matches
+    if ($partnerName) {
+        $stmt = $pdo->prepare("
+            SELECT DISTINCT n.* FROM notifications n
+            LEFT JOIN sales s ON n.reference_id = s.id AND n.reference_type = 'sale'
+            WHERE n.recipient_id = ? 
+               OR (n.recipient_type = 'admin' AND n.recipient_id IS NULL)
+               OR (n.type = 'discount_request' AND n.reference_type = 'sale' AND s.discount_partner_name = ?)
+            ORDER BY n.created_at DESC LIMIT 50
+        ");
+        $stmt->execute([$partnerId, $partnerName]);
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT * FROM notifications 
+            WHERE recipient_id = ? 
+               OR (recipient_type = 'admin' AND recipient_id IS NULL)
+            ORDER BY created_at DESC LIMIT 50
+        ");
+        $stmt->execute([$partnerId]);
+    }
+    
     jsonResponse(['data' => $stmt->fetchAll()]);
 }
 
@@ -55,8 +84,33 @@ function getUnreadCount() {
     $recipientId = getParam('recipientId');
     
     if ($recipientId) {
-        $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM notifications WHERE recipient_id = ? AND is_read = 0");
-        $stmt->execute([$recipientId]);
+        // Get the user's name for broader matching
+        $userStmt = $pdo->prepare("SELECT name FROM profiles WHERE id = ?");
+        $userStmt->execute([$recipientId]);
+        $user = $userStmt->fetch();
+        $userName = $user ? $user['name'] : '';
+        
+        if ($userName) {
+            $stmt = $pdo->prepare("
+                SELECT COUNT(DISTINCT n.id) as count FROM notifications n
+                LEFT JOIN sales s ON n.reference_id = s.id AND n.reference_type = 'sale'
+                WHERE n.is_read = 0 AND (
+                    n.recipient_id = ? 
+                    OR (n.recipient_type = 'admin' AND n.recipient_id IS NULL)
+                    OR (n.type = 'discount_request' AND n.reference_type = 'sale' AND s.discount_partner_name = ?)
+                )
+            ");
+            $stmt->execute([$recipientId, $userName]);
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) as count FROM notifications 
+                WHERE is_read = 0 AND (
+                    recipient_id = ? 
+                    OR (recipient_type = 'admin' AND recipient_id IS NULL)
+                )
+            ");
+            $stmt->execute([$recipientId]);
+        }
     } else {
         $stmt = $pdo->query("SELECT COUNT(*) as count FROM notifications WHERE is_read = 0");
     }

@@ -1,12 +1,15 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { useEffect } from 'react';
 import Layout from './components/Layout/Layout';
+import PushNotificationService from './services/PushNotificationService';
 
 // Auth Pages
 import Login from './pages/Auth/Login';
 
 // Pages
 import Dashboard from './pages/Dashboard/Dashboard';
+import PartnerDashboard from './pages/Dashboard/PartnerDashboard';
 import ProjectList from './pages/Projects/ProjectList';
 import ProjectWizard from './pages/Projects/ProjectWizard';
 import ProjectDetail from './pages/Projects/ProjectDetail';
@@ -28,6 +31,7 @@ import DisbursementList from './pages/Treasury/DisbursementList';
 import DisbursementForm from './pages/Treasury/DisbursementForm';
 import UtilityList from './pages/Utilities/UtilityList';
 import UtilityForm from './pages/Utilities/UtilityForm';
+import NotificationList from './pages/Notifications/NotificationList';
 
 // Protected Route Component
 function ProtectedRoute({ children, requiredRole }) {
@@ -55,7 +59,20 @@ function ProtectedRoute({ children, requiredRole }) {
 }
 
 function App() {
-    const { isAuthenticated, isLoading, isSeller, isTreasurer } = useAuth();
+    const { isAuthenticated, isLoading, isSeller, isTreasurer, isPartner, currentUser } = useAuth();
+
+    // Initialize push notifications when user is logged in
+    useEffect(() => {
+        if (isAuthenticated && currentUser) {
+            const token = localStorage.getItem('loteclick_token');
+            if (token) {
+                PushNotificationService.initialize(token, (notification) => {
+                    // Handle foreground notification - could show a toast
+                    console.log('Notification received:', notification.title);
+                });
+            }
+        }
+    }, [isAuthenticated, currentUser]);
 
     if (isLoading) {
         return (
@@ -70,6 +87,7 @@ function App() {
     const getDefaultRoute = () => {
         if (isSeller()) return <Navigate to="/projects" replace />;
         if (isTreasurer()) return <Navigate to="/payments" replace />;
+        if (isPartner()) return <PartnerDashboard />;
         return <Dashboard />;
     };
 
@@ -87,6 +105,7 @@ function App() {
                             <Routes>
                                 {/* Dashboard - role-based default */}
                                 <Route path="/" element={getDefaultRoute()} />
+                                <Route path="/partner-dashboard" element={<PartnerDashboard />} />
 
                                 {/* Projects */}
                                 <Route path="/projects" element={<ProjectList />} />
@@ -131,6 +150,9 @@ function App() {
 
                                 {/* Reports */}
                                 <Route path="/reports" element={<Reports />} />
+
+                                {/* Notifications */}
+                                <Route path="/notifications" element={<NotificationList />} />
 
                                 {/* Fallback */}
                                 <Route path="*" element={<Navigate to="/" replace />} />

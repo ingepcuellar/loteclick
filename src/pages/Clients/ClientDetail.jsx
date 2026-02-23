@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
     FiEdit2,
@@ -12,6 +13,8 @@ import {
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { formatCurrency, formatDateLong as formatDate } from '../../lib/formatters';
+import ConfirmModal from '../../components/ui/ConfirmModal';
 
 function ClientDetail() {
     const { id } = useParams();
@@ -36,32 +39,22 @@ function ClientDetail() {
         );
     }
 
+    const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
     const handleDelete = () => {
         if (clientSales.length > 0) {
             alert(`No se puede eliminar el cliente porque tiene ${clientSales.length} venta(s) asociada(s).`);
             return;
         }
-        if (window.confirm(`¿Estás seguro de eliminar el cliente "${client.name || client.fullName}"?`)) {
-            deleteClient(id);
-            navigate('/clients');
-        }
+        setShowConfirmDelete(true);
     };
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount);
+    const executeDelete = () => {
+        deleteClient(id);
+        navigate('/clients');
     };
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('es-CO', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
-    };
+
 
     // Calculate totals
     const totalPurchases = clientSales.reduce((sum, s) => sum + parseFloat(s.totalPrice || 0), 0);
@@ -306,6 +299,16 @@ function ClientDetail() {
                     </div>
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={showConfirmDelete}
+                title={`¿Eliminar cliente "${client.name || client.fullName}"?`}
+                message="Esta acción no se puede deshacer."
+                confirmText="Eliminar"
+                variant="danger"
+                onConfirm={executeDelete}
+                onCancel={() => setShowConfirmDelete(false)}
+            />
         </div>
     );
 }

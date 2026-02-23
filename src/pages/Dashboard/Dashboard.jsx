@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
     FiFolder,
@@ -14,27 +14,21 @@ import {
     FiAlertTriangle
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import StatCard from '../../components/ui/StatCard';
+import EmptyState from '../../components/ui/EmptyState';
 import { installmentService } from '../../services/installmentService';
+import { api } from '../../lib/apiClient';
+import { formatCurrency, formatDate } from '../../lib/formatters';
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, Legend
+} from 'recharts';
 
 function Dashboard() {
     const { state, getStats } = useApp();
     const stats = getStats();
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('es-CO', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    };
 
     // Recent sales
     const recentSales = [...state.sales]
@@ -63,73 +57,90 @@ function Dashboard() {
             }
         };
         fetchOverdue();
+
+        // Auto-generate overdue notifications
+        api.post('endpoints/check-overdue.php').catch(() => { });
     }, []);
+
+    // Chart data: monthly revenue (last 6 months)
+    const monthlyData = useMemo(() => {
+        const months = [];
+        const now = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const label = d.toLocaleDateString('es-CO', { month: 'short' }).replace('.', '');
+            months.push({ key, label: label.charAt(0).toUpperCase() + label.slice(1), ventas: 0, pagos: 0 });
+        }
+        state.sales.forEach(sale => {
+            const d = new Date(sale.createdAt);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const found = months.find(m => m.key === key);
+            if (found) found.ventas += parseFloat(sale.totalPrice || 0);
+        });
+        state.payments.forEach(payment => {
+            const d = new Date(payment.createdAt || payment.date);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const found = months.find(m => m.key === key);
+            if (found) found.pagos += parseFloat(payment.amount || 0);
+        });
+        return months;
+    }, [state.sales, state.payments]);
+
+    // Chart data: lot status distribution
+    const lotStatusData = useMemo(() => {
+        let available = 0, sold = 0, pending = 0;
+        state.projects.forEach(project => {
+            (project.lots || []).forEach(lot => {
+                if (lot.status === 'sold') sold++;
+                else if (lot.status === 'pending_initial') pending++;
+                else available++;
+            });
+        });
+        return [
+            { name: 'Disponibles', value: available, color: '#22c55e' },
+            { name: 'Vendidos', value: sold, color: '#6366f1' },
+            { name: 'Pendientes', value: pending, color: '#f59e0b' }
+        ].filter(d => d.value > 0);
+    }, [state.projects]);
+
+    const chartTooltipFormatter = (value) => formatCurrency(value);
 
     return (
         <div className="animate-fadeIn">
             {/* Stats Cards */}
             <div className="grid grid-4 mb-6">
-                <div className="card">
-                    <div className="stat-card">
-                        <div className="stat-icon primary">
-                            <FiFolder />
-                        </div>
-                        <div className="stat-content">
-                            <h3>{stats.totalProjects}</h3>
-                            <p>Proyectos</p>
-                            <div className="stat-trend up">
-                                <span>{stats.availableLots} lotes disponibles</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="card">
-                    <div className="stat-card">
-                        <div className="stat-icon accent">
-                            <FiUsers />
-                        </div>
-                        <div className="stat-content">
-                            <h3>{stats.totalClients}</h3>
-                            <p>Clientes</p>
-                            <div className="stat-trend up">
-                                <FiTrendingUp size={14} />
-                                <span>Activos</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="card">
-                    <div className="stat-card">
-                        <div className="stat-icon warning">
-                            <FiShoppingCart />
-                        </div>
-                        <div className="stat-content">
-                            <h3>{stats.totalSales}</h3>
-                            <p>Ventas</p>
-                            <div className="stat-trend up">
-                                <span>{formatCurrency(stats.totalRevenue)}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="card">
-                    <div className="stat-card">
-                        <div className="stat-icon info">
-                            <FiDollarSign />
-                        </div>
-                        <div className="stat-content">
-                            <h3>{formatCurrency(stats.totalCollected)}</h3>
-                            <p>Recaudado</p>
-                            <div className="stat-trend down">
-                                <FiTrendingDown size={14} />
-                                <span>{formatCurrency(stats.totalPending)} pendiente</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <StatCard
+                    icon={FiFolder}
+                    label="Proyectos"
+                    value={stats.totalProjects}
+                    trend={`${stats.availableLots} lotes disponibles`}
+                    variant="primary"
+                />
+                <StatCard
+                    icon={FiUsers}
+                    label="Clientes"
+                    value={stats.totalClients}
+                    trend="Activos"
+                    trendDirection="up"
+                    variant="accent"
+                />
+                <StatCard
+                    icon={FiShoppingCart}
+                    label="Ventas"
+                    value={stats.totalSales}
+                    trend={formatCurrency(stats.totalRevenue)}
+                    trendDirection="up"
+                    variant="warning"
+                />
+                <StatCard
+                    icon={FiDollarSign}
+                    label="Recaudado"
+                    value={formatCurrency(stats.totalCollected)}
+                    trend={`${formatCurrency(stats.totalPending)} pendiente`}
+                    trendDirection="down"
+                    variant="info"
+                />
             </div>
 
             {/* Quick Actions */}
@@ -155,6 +166,102 @@ function Dashboard() {
                             <FiPlus />
                             Registrar Pago
                         </Link>
+                    </div>
+                </div>
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-2 mb-6">
+                {/* Monthly Revenue Chart */}
+                <div className="card">
+                    <div className="card-header">
+                        <h3 className="card-title">
+                            <FiTrendingUp className="card-title-icon" />
+                            Ingresos Mensuales
+                        </h3>
+                    </div>
+                    <div className="card-body">
+                        {monthlyData.some(m => m.ventas > 0 || m.pagos > 0) ? (
+                            <ResponsiveContainer width="100%" height={280}>
+                                <BarChart data={monthlyData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                                    <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+                                    <YAxis
+                                        tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                                        tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v}
+                                        width={55}
+                                    />
+                                    <Tooltip
+                                        formatter={chartTooltipFormatter}
+                                        contentStyle={{
+                                            background: 'var(--bg-secondary)',
+                                            border: '1px solid var(--border-primary)',
+                                            borderRadius: 'var(--radius-lg)',
+                                            color: 'var(--text-primary)'
+                                        }}
+                                        labelStyle={{ color: 'var(--text-secondary)' }}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-muted)' }} />
+                                    <Bar dataKey="ventas" name="Ventas" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="pagos" name="Pagos" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <EmptyState
+                                icon={FiTrendingUp}
+                                title="Sin datos"
+                                description="Registra ventas para ver las gráficas"
+                                style={{ padding: 'var(--spacing-8)' }}
+                            />
+                        )}
+                    </div>
+                </div>
+
+                {/* Lot Status Pie Chart */}
+                <div className="card">
+                    <div className="card-header">
+                        <h3 className="card-title">
+                            <FiGrid className="card-title-icon" />
+                            Distribución de Lotes
+                        </h3>
+                    </div>
+                    <div className="card-body">
+                        {lotStatusData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={280}>
+                                <PieChart>
+                                    <Pie
+                                        data={lotStatusData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={100}
+                                        paddingAngle={4}
+                                        dataKey="value"
+                                        label={({ name, value }) => `${name}: ${value}`}
+                                    >
+                                        {lotStatusData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        contentStyle={{
+                                            background: 'var(--bg-secondary)',
+                                            border: '1px solid var(--border-primary)',
+                                            borderRadius: 'var(--radius-lg)',
+                                            color: 'var(--text-primary)'
+                                        }}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-muted)' }} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <EmptyState
+                                icon={FiGrid}
+                                title="Sin lotes"
+                                description="Crea un proyecto con lotes para ver la distribución"
+                                style={{ padding: 'var(--spacing-8)' }}
+                            />
+                        )}
                     </div>
                 </div>
             </div>
@@ -230,16 +337,14 @@ function Dashboard() {
                     </div>
                     <div className="card-body">
                         {state.projects.length === 0 ? (
-                            <div className="empty-state" style={{ padding: 'var(--spacing-8)' }}>
-                                <div className="empty-state-icon">
-                                    <FiFolder />
-                                </div>
-                                <h3>Sin proyectos</h3>
-                                <p>Crea tu primer proyecto para comenzar</p>
-                                <Link to="/projects/new" className="btn btn-primary btn-sm">
-                                    <FiPlus /> Crear Proyecto
-                                </Link>
-                            </div>
+                            <EmptyState
+                                icon={FiFolder}
+                                title="Sin proyectos"
+                                description="Crea tu primer proyecto para comenzar"
+                                actionLabel="Crear Proyecto"
+                                actionTo="/projects/new"
+                                style={{ padding: 'var(--spacing-8)' }}
+                            />
                         ) : (
                             <div className="flex flex-col gap-4">
                                 {state.projects.slice(0, 3).map(project => {
@@ -293,13 +398,12 @@ function Dashboard() {
                     </div>
                     <div className="card-body">
                         {salesWithPendingPayments.length === 0 ? (
-                            <div className="empty-state" style={{ padding: 'var(--spacing-8)' }}>
-                                <div className="empty-state-icon">
-                                    <FiDollarSign />
-                                </div>
-                                <h3>Sin pagos pendientes</h3>
-                                <p>Todas las ventas están al día</p>
-                            </div>
+                            <EmptyState
+                                icon={FiDollarSign}
+                                title="Sin pagos pendientes"
+                                description="Todas las ventas están al día"
+                                style={{ padding: 'var(--spacing-8)' }}
+                            />
                         ) : (
                             <div className="flex flex-col gap-4">
                                 {salesWithPendingPayments.map(sale => {

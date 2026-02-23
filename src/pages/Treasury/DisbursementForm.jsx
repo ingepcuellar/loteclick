@@ -16,6 +16,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { disbursementService } from '../../services/disbursementService';
 import { storageService } from '../../services/storageService';
+import { formatCurrency } from '../../lib/formatters';
 
 function DisbursementForm() {
     const navigate = useNavigate();
@@ -179,10 +180,7 @@ function DisbursementForm() {
         }
     };
 
-    const formatCurrency = (value) => {
-        const num = parseFloat(value) || 0;
-        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(num);
-    };
+
 
     return (
         <div className="page-container">

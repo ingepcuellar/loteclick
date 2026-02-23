@@ -12,6 +12,7 @@ import {
     FiSave
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { formatCurrency } from '../../lib/formatters';
 
 function ProjectWizard() {
     const navigate = useNavigate();
@@ -170,14 +171,7 @@ function ProjectWizard() {
         navigate('/projects');
     };
 
-    const formatCurrency = (value) => {
-        const num = parseFloat(value) || 0;
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(num);
-    };
+
 
     return (
         <div className="animate-fadeIn">

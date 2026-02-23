@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import CommandPalette from '../ui/CommandPalette';
 
 function Layout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -23,6 +24,9 @@ function Layout({ children }) {
             <main className="main-content">
                 {children}
             </main>
+
+            {/* Global Search */}
+            <CommandPalette />
         </div>
     );
 }

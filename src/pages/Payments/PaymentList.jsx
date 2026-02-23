@@ -10,27 +10,14 @@ import {
     FiImage
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { formatCurrency, formatDate } from '../../lib/formatters';
 
 function PaymentList() {
     const { state, getSaleById, getClientById, getProjectById } = useApp();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterProject, setFilterProject] = useState('');
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('es-CO', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    };
 
     // Sort payments by date (newest first)
     const sortedPayments = [...state.payments].sort(

@@ -24,3 +24,6 @@ android/
 # OS
 .DS_Store
 Thumbs.db
+
+# Firebase (sensitive credentials)
+firebase-service-account.json

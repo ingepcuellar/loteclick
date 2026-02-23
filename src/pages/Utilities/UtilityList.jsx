@@ -15,6 +15,7 @@ import {
     FiWind
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { formatCurrency, formatDate } from '../../lib/formatters';
 
 const SERVICE_TYPES = {
     water: { label: 'Agua', icon: FiDroplet, color: '#3b82f6' },
@@ -77,22 +78,7 @@ function UtilityList() {
         });
     };
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0
-        }).format(amount);
-    };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return '—';
-        return new Date(dateString).toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
-    };
 
     return (
         <div className="page-container">

@@ -10,6 +10,7 @@ import {
     FiCalendar
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { formatCurrency, formatDate } from '../../lib/formatters';
 
 function SalesList() {
     const { state, getPaymentsBySale } = useApp();
@@ -17,24 +18,7 @@ function SalesList() {
     const [filterProject, setFilterProject] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return '-';
-        return date.toLocaleDateString('es-CO', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    };
 
     const getSaleStatus = (sale) => {
         const payments = getPaymentsBySale(sale.id);

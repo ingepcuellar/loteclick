@@ -13,6 +13,7 @@ import {
     FiSearch
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { formatCurrency } from '../../lib/formatters';
 import { storageService } from '../../services/storageService';
 import { parseBarcodeInput, generatePaymentReceiptHTML, openPrintWindow, writeToPrintWindow } from '../../lib/barcodeUtils';
 
@@ -54,13 +55,7 @@ function PaymentForm() {
     const [barcodeError, setBarcodeError] = useState('');
     const barcodeInputRef = useRef(null);
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
+
 
     // Handle barcode scan input (barcode scanners act as keyboard + Enter)
     const handleBarcodeKeyDown = (e) => {

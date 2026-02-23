@@ -1,15 +1,25 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiPlus, FiFolder, FiMapPin, FiUsers, FiGrid, FiEdit2, FiTrash2, FiEye } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import ConfirmModal from '../../components/ui/ConfirmModal';
+import PageHeader from '../../components/ui/PageHeader';
+import EmptyState from '../../components/ui/EmptyState';
 
 function ProjectList() {
     const { state, deleteProject } = useApp();
     const { isSeller, isAdmin } = useAuth();
+    const [confirmDelete, setConfirmDelete] = useState(null);
 
     const handleDelete = (projectId, projectName) => {
-        if (window.confirm(`¿Estás seguro de eliminar el proyecto "${projectName}"? Esto también eliminará todas las ventas asociadas.`)) {
-            deleteProject(projectId);
+        setConfirmDelete({ id: projectId, name: projectName });
+    };
+
+    const executeDelete = () => {
+        if (confirmDelete) {
+            deleteProject(confirmDelete.id);
+            setConfirmDelete(null);
         }
     };
 
@@ -25,33 +35,26 @@ function ProjectList() {
     return (
         <div className="animate-fadeIn">
             {/* Page Header */}
-            <div className="page-header">
-                <div className="page-header-content">
-                    <h1>Proyectos</h1>
-                    <p>Gestiona tus proyectos de venta de lotes</p>
-                </div>
-                <div className="page-header-actions">
+            <PageHeader
+                title="Proyectos"
+                subtitle="Gestiona tus proyectos de venta de lotes"
+                actions={
                     <Link to="/projects/new" className="btn btn-primary">
-                        <FiPlus />
-                        Nuevo Proyecto
+                        <FiPlus /> Nuevo Proyecto
                     </Link>
-                </div>
-            </div>
+                }
+            />
 
             {/* Projects Grid */}
             {state.projects.length === 0 ? (
                 <div className="card">
-                    <div className="empty-state">
-                        <div className="empty-state-icon">
-                            <FiFolder />
-                        </div>
-                        <h3>No hay proyectos</h3>
-                        <p>Crea tu primer proyecto para comenzar a gestionar la venta de lotes</p>
-                        <Link to="/projects/new" className="btn btn-primary">
-                            <FiPlus />
-                            Crear Proyecto
-                        </Link>
-                    </div>
+                    <EmptyState
+                        icon={FiFolder}
+                        title="No hay proyectos"
+                        description="Crea tu primer proyecto para comenzar a gestionar la venta de lotes"
+                        actionLabel="Crear Proyecto"
+                        actionTo="/projects/new"
+                    />
                 </div>
             ) : (
                 <div className="grid grid-3">
@@ -200,6 +203,16 @@ function ProjectList() {
                     })}
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={!!confirmDelete}
+                title={`¿Eliminar proyecto "${confirmDelete?.name}"?`}
+                message="Esto también eliminará todas las ventas asociadas. Esta acción no se puede deshacer."
+                confirmText="Eliminar"
+                variant="danger"
+                onConfirm={executeDelete}
+                onCancel={() => setConfirmDelete(null)}
+            />
         </div>
     );
 }

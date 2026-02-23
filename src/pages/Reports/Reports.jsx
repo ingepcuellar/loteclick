@@ -13,7 +13,14 @@ import {
     FiMapPin,
     FiFileText
 } from 'react-icons/fi';
+import {
+    exportSalesPDF,
+    exportPaymentsPDF,
+    exportExpensesPDF,
+    exportAgentsPDF
+} from '../../lib/pdfExporter';
 import { useApp } from '../../context/AppContext';
+import { formatCurrency, formatDate } from '../../lib/formatters';
 
 // Category labels for display
 const CATEGORY_LABELS = {
@@ -63,21 +70,7 @@ function Reports() {
 
     const stats = getStats();
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('es-CO', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    };
 
     // Filter data based on project and date
     const filterByDateAndProject = (items, dateField = 'createdAt') => {
@@ -689,20 +682,56 @@ function Reports() {
                     </h3>
                 </div>
                 <div className="card-body">
+                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: 'var(--spacing-4)' }}>
+                        Descarga los datos filtrados en formato CSV o PDF profesional.
+                    </p>
                     <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                         <button className="btn btn-secondary" onClick={() => exportToCSV(filteredSales, 'ventas')} disabled={filteredSales.length === 0}>
                             <FiDownload /> Ventas (CSV)
                         </button>
+                        <button className="btn btn-primary" onClick={() => {
+                            const period = dateRange.start && dateRange.end ? `${dateRange.start} a ${dateRange.end}` : 'Todo';
+                            const projName = selectedProject ? state.projects.find(p => p.id === selectedProject)?.name : '';
+                            exportSalesPDF(filteredSales, state.clients, state.projects, getPaymentsBySale, formatCurrency, formatDate, period, projName);
+                        }} disabled={filteredSales.length === 0}>
+                            <FiFileText /> Ventas (PDF)
+                        </button>
+
                         <button className="btn btn-secondary" onClick={() => exportToCSV(filteredPayments, 'pagos')} disabled={filteredPayments.length === 0}>
                             <FiDownload /> Pagos (CSV)
                         </button>
+                        <button className="btn btn-primary" onClick={() => {
+                            const period = dateRange.start && dateRange.end ? `${dateRange.start} a ${dateRange.end}` : 'Todo';
+                            const projName = selectedProject ? state.projects.find(p => p.id === selectedProject)?.name : '';
+                            exportPaymentsPDF(filteredPayments, state.sales, state.clients, state.projects, formatCurrency, formatDate, period, projName);
+                        }} disabled={filteredPayments.length === 0}>
+                            <FiFileText /> Pagos (PDF)
+                        </button>
+
                         <button className="btn btn-secondary" onClick={() => exportToCSV(filteredExpenses, 'gastos')} disabled={filteredExpenses.length === 0}
                             style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', borderColor: 'transparent' }}>
                             <FiDownload /> Gastos (CSV)
                         </button>
+                        <button className="btn btn-primary" onClick={() => {
+                            const period = dateRange.start && dateRange.end ? `${dateRange.start} a ${dateRange.end}` : 'Todo';
+                            const projName = selectedProject ? state.projects.find(p => p.id === selectedProject)?.name : '';
+                            exportExpensesPDF(filteredExpenses, state.projects, CATEGORY_LABELS, formatCurrency, formatDate, period, projName);
+                        }} disabled={filteredExpenses.length === 0}
+                            style={{ background: 'linear-gradient(135deg, #dc2626, #b91c1c)', borderColor: 'transparent' }}>
+                            <FiFileText /> Gastos (PDF)
+                        </button>
+
                         <button className="btn btn-secondary" onClick={() => exportToCSV(agentPerformance, 'comisionistas')} disabled={agentPerformance.length === 0}
                             style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', borderColor: 'transparent' }}>
                             <FiDownload /> Comisionistas (CSV)
+                        </button>
+                        <button className="btn btn-primary" onClick={() => {
+                            const period = dateRange.start && dateRange.end ? `${dateRange.start} a ${dateRange.end}` : 'Todo';
+                            const projName = selectedProject ? state.projects.find(p => p.id === selectedProject)?.name : '';
+                            exportAgentsPDF(agentPerformance, formatCurrency, period, projName);
+                        }} disabled={agentPerformance.length === 0}
+                            style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', borderColor: 'transparent' }}>
+                            <FiFileText /> Comisionistas (PDF)
                         </button>
                     </div>
                 </div>

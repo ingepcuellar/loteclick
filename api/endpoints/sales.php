@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../jwt.php';
+require_once __DIR__ . '/../push-helper.php';
 
 $auth = requireAuth();
 $action = getParam('action', '');
@@ -184,17 +185,47 @@ function createSale() {
             $lotNumber = $body['lot_number'] ?? $body['lotNumber'] ?? 'N/A';
             $salePrice = floatval($body['sale_price'] ?? $body['totalPrice'] ?? 0);
             
+            // Look up the seller's name (who created this sale)
+            global $auth;
+            $sellerName = 'Desconocido';
+            if (isset($auth['sub'])) {
+                $sellerStmt = $pdo->prepare("SELECT name FROM profiles WHERE id = ?");
+                $sellerStmt->execute([$auth['sub']]);
+                $sellerRow = $sellerStmt->fetch();
+                if ($sellerRow) $sellerName = $sellerRow['name'];
+            }
+            
+            // Look up the real user ID by partner name (project partners use random IDs, not user IDs)
+            $realUserId = $discountAuthorizedBy; // fallback to the project partner ID
+            if ($discountPartnerName) {
+                $userLookup = $pdo->prepare("SELECT id FROM profiles WHERE name = ? AND role = 'partner' LIMIT 1");
+                $userLookup->execute([$discountPartnerName]);
+                $foundUser = $userLookup->fetch();
+                if ($foundUser) {
+                    $realUserId = $foundUser['id'];
+                }
+            }
+            
             $notifStmt = $pdo->prepare(
                 "INSERT INTO notifications (id, recipient_type, recipient_id, type, title, message, reference_id, reference_type) 
                  VALUES (?, 'partner', ?, 'discount_request', ?, ?, ?, 'sale')"
             );
             $notifStmt->execute([
                 $notifId,
-                $discountAuthorizedBy,
+                $realUserId,
                 'Solicitud de Descuento',
-                "Se ha aplicado un descuento de $" . number_format($discountAmount, 0, ',', '.') . " en la venta del Lote #$lotNumber. Precio original: $" . number_format($originalPrice, 0, ',', '.') . ", Precio de venta: $" . number_format($salePrice, 0, ',', '.') . ". Cliente: $clientName. La venta se realizó sin detener el proceso.",
+                "Se ha aplicado un descuento de $" . number_format($discountAmount, 0, ',', '.') . " en la venta del Lote #$lotNumber. Precio original: $" . number_format($originalPrice, 0, ',', '.') . ", Precio de venta: $" . number_format($salePrice, 0, ',', '.') . ". Cliente: $clientName. Vendedor: $sellerName. La venta se realizó sin detener el proceso.",
                 $id,
             ]);
+            
+            // Send push notification to the partner
+            try {
+                $pushMessage = "Descuento de $" . number_format($discountAmount, 0, ',', '.') . " en Lote #$lotNumber. Vendedor: $sellerName.";
+                sendPushToUser($pdo, $realUserId, 'Solicitud de Descuento', $pushMessage, ['route' => '/notifications']);
+            } catch (Exception $e) {
+                // Push failure should not break the sale
+                error_log('Push notification failed: ' . $e->getMessage());
+            }
         }
 
         $pdo->commit();
