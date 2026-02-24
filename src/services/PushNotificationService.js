@@ -65,11 +65,8 @@ class PushNotificationService {
             PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
                 console.log('Push notification tapped:', action);
                 // Navigate to notifications page
-                if (action.notification?.data?.route) {
-                    window.location.hash = action.notification.data.route;
-                } else {
-                    window.location.hash = '#/notifications';
-                }
+                const route = action.notification?.data?.route || '/notifications';
+                window.location.href = route;
             });
 
             this.initialized = true;

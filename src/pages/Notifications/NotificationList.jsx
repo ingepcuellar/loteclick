@@ -94,16 +94,15 @@ function NotificationList() {
             );
         }
 
-        // Navigate to referenced resource
+        // Navigate to referenced resource (only for roles that have access)
         if (notification.reference_type === 'installment' && notification.reference_id) {
-            // Navigate to the sale (installments are viewed from sale detail)
-            // We need to find the sale from the notification message or reference
             navigate('/payments');
-        } else if (notification.reference_type === 'sale' && notification.reference_id) {
+        } else if (notification.reference_type === 'sale' && notification.reference_id && !isPartner()) {
             navigate(`/sales/${notification.reference_id}`);
         } else if (notification.reference_type === 'project' && notification.reference_id) {
             navigate(`/projects/${notification.reference_id}`);
         }
+        // Partners stay on notifications page — the message contains all relevant details
     };
 
     const getTimeAgo = (dateStr) => {
