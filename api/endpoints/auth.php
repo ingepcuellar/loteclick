@@ -149,7 +149,7 @@ function handleUsers() {
     foreach ($users as &$u) {
         unset($u['password']);
         $u['is_active'] = (bool)$u['is_active'];
-        $u['associated_projects'] = json_decode($u['associated_projects'], true) ?: [];
+        $u['associated_projects'] = json_decode($u['associated_projects'] ?? '[]', true) ?: [];
     }
 
     jsonResponse(['data' => $users]);
@@ -193,7 +193,7 @@ function handleUpdate() {
     $user = $stmt->fetch();
     unset($user['password']);
     $user['is_active'] = (bool)$user['is_active'];
-    $user['associated_projects'] = json_decode($user['associated_projects'], true) ?: [];
+    $user['associated_projects'] = json_decode($user['associated_projects'] ?? '[]', true) ?: [];
 
     jsonResponse(['data' => $user]);
 }
