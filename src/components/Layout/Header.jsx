@@ -180,7 +180,7 @@ function Header({ onMenuClick }) {
                                 className="user-dropdown-item"
                                 onClick={() => {
                                     setShowUserMenu(false);
-                                    // navigate('/profile'); // Future feature
+                                    navigate('/profile');
                                 }}
                             >
                                 <FiUser /> Mi Perfil

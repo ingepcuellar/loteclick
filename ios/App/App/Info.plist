@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>LoteClick</string>
+        <string>PredioClick</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -51,5 +51,11 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>PredioClick necesita acceso a la cámara para tomar fotos de comprobantes de pago</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PredioClick necesita acceso a la galería para seleccionar fotos de comprobantes</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>PredioClick necesita guardar comprobantes en tu galería</string>
 </dict>
 </plist>

@@ -33,6 +33,7 @@ import UtilityList from './pages/Utilities/UtilityList';
 import UtilityForm from './pages/Utilities/UtilityForm';
 import NotificationList from './pages/Notifications/NotificationList';
 import PushDiagnostic from './pages/PushDiagnostic';
+import Profile from './pages/Profile/Profile';
 
 // Protected Route Component
 function ProtectedRoute({ children, requiredRole }) {
@@ -157,6 +158,9 @@ function App() {
 
                                 {/* Push Diagnostic (temporary) */}
                                 <Route path="/push-diagnostic" element={<PushDiagnostic />} />
+
+                                {/* Profile */}
+                                <Route path="/profile" element={<Profile />} />
 
                                 {/* Fallback */}
                                 <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,6 @@
 {
     "appId": "com.loteclick.app",
-    "appName": "LoteClick",
+    "appName": "PredioClick",
     "webDir": "dist",
     "server": {
         "androidScheme": "https",
