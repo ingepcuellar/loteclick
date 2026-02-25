@@ -156,7 +156,7 @@ _________________________          _________________________
     <div class="invoice-container">
         <div class="header">
             <div>
-                <div class="logo">🏡 LoteClick</div>
+                <div class="logo">🏡 PredioClick</div>
                 <p style="color: #666; margin-top: 5px;">Sistema de Gestión de Loteos</p>
             </div>
             <div class="invoice-info">
@@ -237,7 +237,7 @@ _________________________          _________________________
         </div>
 
         <div class="footer">
-            <p>Esta factura fue generada automáticamente por LoteClick</p>
+            <p>Esta factura fue generada automáticamente por PredioClick</p>
             <p style="margin-top: 5px;">Fecha de generación: ${new Date().toLocaleDateString('es-CO')} ${new Date().toLocaleTimeString('es-CO')}</p>
         </div>
     </div>

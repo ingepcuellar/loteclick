@@ -173,7 +173,7 @@ export function generatePaymentSlipHTML({ sale, client, project, installments })
 <div class="doc-container">
     <div class="header">
         <div>
-            <div class="logo">🏡 LoteClick</div>
+            <div class="logo">🏡 PredioClick</div>
             <div class="logo-sub">Recibo de Venta</div>
         </div>
         <div class="doc-title">
@@ -228,7 +228,7 @@ export function generatePaymentSlipHTML({ sale, client, project, installments })
     </div>
 
     <div class="footer">
-        <p>LoteClick - Sistema de Gestión de Loteos</p>
+        <p>PredioClick - Sistema de Gestión de Loteos</p>
         <p>Documento generado el ${fmtDate(new Date().toISOString())}</p>
     </div>
 </div>
@@ -257,7 +257,7 @@ export function generatePaymentReceiptHTML({ payment, sale, client, project }) {
 <div class="doc-container">
     <div class="header">
         <div>
-            <div class="logo">🏡 LoteClick</div>
+            <div class="logo">🏡 PredioClick</div>
             <div class="logo-sub">Recibo de Pago</div>
         </div>
         <div class="doc-title">
@@ -317,7 +317,7 @@ export function generatePaymentReceiptHTML({ payment, sale, client, project }) {
     </div>
 
     <div class="footer">
-        <p>LoteClick - Sistema de Gestión de Loteos</p>
+        <p>PredioClick - Sistema de Gestión de Loteos</p>
         <p>Documento generado el ${fmtDate(new Date().toISOString())}</p>
     </div>
 </div>

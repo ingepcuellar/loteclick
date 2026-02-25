@@ -57,7 +57,7 @@ export function exportReportToPDF({
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
     doc.setTextColor(...COLORS.white);
-    doc.text('LoteClick', 14, 13);
+    doc.text('PredioClick', 14, 13);
 
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
@@ -160,7 +160,7 @@ export function exportReportToPDF({
 
             const pageNum = doc.internal.getNumberOfPages();
             doc.text(
-                `LoteClick — ${title} | Página ${data.pageNumber} de ${pageNum}`,
+                `PredioClick — ${title} | Página ${data.pageNumber} de ${pageNum}`,
                 pageWidth / 2, pageHeight - 8,
                 { align: 'center' }
             );

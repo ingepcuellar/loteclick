@@ -14,6 +14,7 @@ import {
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { storageService } from '../../services/storageService';
+import { pickImage } from '../../lib/cameraUtils';
 
 const EXPENSE_CATEGORIES = [
     {
@@ -338,24 +339,20 @@ function ExpenseForm() {
                                 <FiUpload style={{ marginRight: '0.5rem' }} />
                                 Adjunto (factura, recibo, etc.)
                             </label>
-                            <input
-                                type="file"
-                                accept="image/*,.pdf"
-                                className="form-control"
-                                onChange={(e) => {
-                                    const file = e.target.files[0];
-                                    if (file) {
-                                        setAttachmentFile(file);
-                                        if (file.type.startsWith('image/')) {
-                                            const reader = new FileReader();
-                                            reader.onload = (ev) => setAttachmentPreview(ev.target.result);
-                                            reader.readAsDataURL(file);
-                                        } else {
-                                            setAttachmentPreview(null);
-                                        }
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={async () => {
+                                    const result = await pickImage({ allowPdf: true });
+                                    if (result) {
+                                        setAttachmentFile(result.file);
+                                        setAttachmentPreview(result.preview);
                                     }
                                 }}
-                            />
+                                style={{ width: '100%', padding: '1rem' }}
+                            >
+                                <FiUpload /> Tomar foto o seleccionar archivo
+                            </button>
                             {attachmentPreview && (
                                 <div style={{ marginTop: '0.5rem' }}>
                                     <img src={attachmentPreview} alt="Vista previa" style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '8px', border: '1px solid var(--border-color)' }} />

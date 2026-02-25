@@ -69,9 +69,9 @@ function Login() {
                 {/* Logo and Title */}
                 <div className="login-header">
                     <div className="login-logo">
-                        <img src="/logo.png" alt="LoteClick" />
+                        <img src="/logo.png" alt="PredioClick" />
                     </div>
-                    <h1>LoteClick</h1>
+                    <h1>PredioClick</h1>
                     <p>Sistema de Gestión de Lotes</p>
                 </div>
 

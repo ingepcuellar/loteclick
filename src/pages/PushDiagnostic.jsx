@@ -56,7 +56,7 @@ function PushDiagnostic() {
 
             if (permStatus.receive !== 'granted') {
                 addLog('⚠️ DIAGNÓSTICO', 'error',
-                    'Permisos DENEGADOS. Ve a Ajustes > LoteClick > Notificaciones y activa los permisos.');
+                    'Permisos DENEGADOS. Ve a Ajustes > PredioClick > Notificaciones y activa los permisos.');
                 setRunning(false);
                 return;
             }
@@ -247,8 +247,8 @@ function PushDiagnostic() {
                                 style={{
                                     padding: '0.75rem 1rem',
                                     borderLeft: `4px solid ${log.status === 'ok' ? '#22c55e' :
-                                            log.status === 'error' ? '#ef4444' :
-                                                log.status === 'warn' ? '#f59e0b' : '#6366f1'
+                                        log.status === 'error' ? '#ef4444' :
+                                            log.status === 'warn' ? '#f59e0b' : '#6366f1'
                                         }`
                                 }}
                             >

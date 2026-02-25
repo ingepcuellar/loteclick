@@ -16,6 +16,7 @@ import { useApp } from '../../context/AppContext';
 import { formatCurrency } from '../../lib/formatters';
 import { storageService } from '../../services/storageService';
 import { parseBarcodeInput, generatePaymentReceiptHTML, openPrintWindow, writeToPrintWindow } from '../../lib/barcodeUtils';
+import { pickImage } from '../../lib/cameraUtils';
 
 function PaymentForm() {
     const navigate = useNavigate();
@@ -155,49 +156,37 @@ function PaymentForm() {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleImageUpload = async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-                alert('La imagen no puede ser mayor a 5MB');
-                return;
-            }
+    const handlePickImage = async () => {
+        const result = await pickImage();
+        if (!result) return;
 
-            // Show preview immediately
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                setPreviewImage(event.target.result);
-            };
-            reader.readAsDataURL(file);
+        const { file, preview } = result;
 
-            // Upload to server
-            setUploadingImage(true);
-            try {
-                const { data: uploadData, error } = await storageService.uploadFile(file);
-                const url = uploadData?.url;
-                if (error) {
-                    console.error('Error uploading image:', error);
-                    alert('Error al subir la imagen. Se guardará localmente.');
-                    // Fallback to base64
-                    const reader2 = new FileReader();
-                    reader2.onload = (event) => {
-                        setFormData(prev => ({ ...prev, receiptImage: event.target.result }));
-                    };
-                    reader2.readAsDataURL(file);
-                } else {
-                    setFormData(prev => ({ ...prev, receiptImage: url }));
-                }
-            } catch (err) {
-                console.error('Error uploading:', err);
-                // Fallback to base64
-                const reader2 = new FileReader();
-                reader2.onload = (event) => {
-                    setFormData(prev => ({ ...prev, receiptImage: event.target.result }));
-                };
-                reader2.readAsDataURL(file);
-            } finally {
-                setUploadingImage(false);
+        if (file.size > 5 * 1024 * 1024) {
+            alert('La imagen no puede ser mayor a 5MB');
+            return;
+        }
+
+        // Show preview immediately
+        setPreviewImage(preview);
+
+        // Upload to server
+        setUploadingImage(true);
+        try {
+            const { data: uploadData, error } = await storageService.uploadFile(file);
+            const url = uploadData?.url;
+            if (error) {
+                console.error('Error uploading image:', error);
+                alert('Error al subir la imagen. Se guardará localmente.');
+                setFormData(prev => ({ ...prev, receiptImage: preview }));
+            } else {
+                setFormData(prev => ({ ...prev, receiptImage: url }));
             }
+        } catch (err) {
+            console.error('Error uploading:', err);
+            setFormData(prev => ({ ...prev, receiptImage: preview }));
+        } finally {
+            setUploadingImage(false);
         }
     };
 
@@ -525,14 +514,13 @@ function PaymentForm() {
                         </div>
                         <div className="card-body">
                             {!previewImage ? (
-                                <label className="file-upload" style={{ cursor: uploadingImage ? 'wait' : 'pointer', display: 'block', position: 'relative' }}>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageUpload}
-                                        style={{ display: 'none' }}
-                                        disabled={uploadingImage}
-                                    />
+                                <div
+                                    className="file-upload"
+                                    style={{ cursor: uploadingImage ? 'wait' : 'pointer', display: 'block', position: 'relative' }}
+                                    onClick={!uploadingImage ? handlePickImage : undefined}
+                                    role="button"
+                                    tabIndex={0}
+                                >
                                     {uploadingImage ? (
                                         <div style={{
                                             display: 'flex',
@@ -552,14 +540,14 @@ function PaymentForm() {
                                                 <FiUpload />
                                             </div>
                                             <p style={{ marginBottom: 'var(--spacing-2)' }}>
-                                                <strong>Haz clic para subir</strong> o arrastra una imagen
+                                                <strong>Tomar foto o seleccionar imagen</strong>
                                             </p>
                                             <p className="file-upload-hint">
                                                 PNG, JPG o JPEG (máx. 5MB)
                                             </p>
                                         </>
                                     )}
-                                </label>
+                                </div>
                             ) : (
                                 <div className="file-preview">
                                     <img

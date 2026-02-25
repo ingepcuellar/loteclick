@@ -7,8 +7,7 @@ import {
     FiShoppingCart,
     FiDollarSign,
     FiBarChart2,
-    FiSettings,
-    FiHelpCircle,
+
     FiX,
     FiCreditCard,
     FiUserCheck,
@@ -126,10 +125,10 @@ function Sidebar({ isOpen, onClose }) {
             {/* Header */}
             <div className="sidebar-header">
                 <div className="sidebar-logo">
-                    <img src="/logo.png" alt="LoteClick" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <img src="/logo.png" alt="PredioClick" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
                 <div className="sidebar-brand">
-                    <h1>LoteClick</h1>
+                    <h1>PredioClick</h1>
                     <span>Gestión de Lotes</span>
                 </div>
 
@@ -178,17 +177,7 @@ function Sidebar({ isOpen, onClose }) {
                 })}
             </nav>
 
-            {/* Footer */}
-            <div className="sidebar-footer">
-                <div className="nav-item">
-                    <span className="nav-item-icon"><FiSettings /></span>
-                    <span>Configuración</span>
-                </div>
-                <div className="nav-item">
-                    <span className="nav-item-icon"><FiHelpCircle /></span>
-                    <span>Ayuda</span>
-                </div>
-            </div>
+
         </aside>
     );
 }

@@ -381,7 +381,7 @@ function SaleForm() {
                 const fullPhone = phone.startsWith('57') ? phone : `57${phone}`;
                 const lotNumbers = selectedLots.map(l => `#${l.lotNumber}`).join(', ');
                 const message = encodeURIComponent(
-                    `🏡 *LoteClick - Solicitud de Descuento*\n\n` +
+                    `🏡 *PredioClick - Solicitud de Descuento*\n\n` +
                     `Hola ${partner.name}, se ha registrado un descuento de ${formatCurrency(totalDiscountAmount)} ` +
                     `en la venta del Lote ${lotNumbers} al cliente ${clientName}.\n\n` +
                     `La venta se realizó normalmente. Por favor ingrese al sistema para revisar y aprobar el descuento.\n\n` +

@@ -57,5 +57,7 @@
 	<string>PredioClick necesita acceso a la galería para seleccionar fotos de comprobantes</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>PredioClick necesita guardar comprobantes en tu galería</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>PredioClick puede necesitar acceso al micrófono para captura de video</string>
 </dict>
 </plist>

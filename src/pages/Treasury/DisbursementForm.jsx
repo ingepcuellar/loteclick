@@ -17,6 +17,7 @@ import { useApp } from '../../context/AppContext';
 import { disbursementService } from '../../services/disbursementService';
 import { storageService } from '../../services/storageService';
 import { formatCurrency } from '../../lib/formatters';
+import { pickImage } from '../../lib/cameraUtils';
 
 function DisbursementForm() {
     const navigate = useNavigate();
@@ -110,13 +111,11 @@ function DisbursementForm() {
         setHasSignature(false);
     };
 
-    const handleReceiptUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            setReceiptFile(file);
-            const reader = new FileReader();
-            reader.onload = (ev) => setReceiptPreview(ev.target.result);
-            reader.readAsDataURL(file);
+    const handlePickImage = async () => {
+        const result = await pickImage();
+        if (result) {
+            setReceiptFile(result.file);
+            setReceiptPreview(result.preview);
         }
     };
 
@@ -331,12 +330,14 @@ function DisbursementForm() {
                         </div>
                     ) : (
                         <div>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleReceiptUpload}
-                                className="form-control"
-                            />
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={handlePickImage}
+                                style={{ width: '100%', padding: '1rem' }}
+                            >
+                                <FiUpload /> Tomar foto o seleccionar imagen
+                            </button>
                             {receiptPreview && (
                                 <div style={{ marginTop: '1rem' }}>
                                     <img

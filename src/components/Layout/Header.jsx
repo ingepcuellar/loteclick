@@ -67,7 +67,7 @@ function Header({ onMenuClick }) {
         }
         if (path.startsWith('/reports')) return 'Reportes';
 
-        return 'LoteClick';
+        return 'PredioClick';
     };
 
     const getBreadcrumbs = () => {
