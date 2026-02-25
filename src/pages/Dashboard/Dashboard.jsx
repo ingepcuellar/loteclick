@@ -11,7 +11,8 @@ import {
     FiArrowRight,
     FiMapPin,
     FiCalendar,
-    FiAlertTriangle
+    FiAlertTriangle,
+    FiGrid
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import StatCard from '../../components/ui/StatCard';
