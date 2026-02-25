@@ -17,6 +17,9 @@ switch ($action) {
     case 'unregister':
         unregisterToken();
         break;
+    case 'test':
+        testPush();
+        break;
     default:
         jsonError('Acción no válida', 400);
 }
@@ -76,4 +79,38 @@ function unregisterToken() {
     }
     
     jsonResponse(['data' => ['status' => 'unregistered']]);
+}
+
+/**
+ * Send a test push notification to the current user
+ */
+function testPush() {
+    if (getMethod() !== 'POST') jsonError('Método no permitido', 405);
+    
+    global $auth;
+    $pdo = getConnection();
+    $userId = $auth['sub'];
+    
+    // Check if user has device tokens
+    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM device_tokens WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $tokenCount = $stmt->fetch()['count'];
+    
+    if ($tokenCount == 0) {
+        jsonResponse(['data' => [
+            'status' => 'no_tokens',
+            'message' => 'No hay tokens registrados para este usuario'
+        ]]);
+        return;
+    }
+    
+    $result = sendPushToUser($pdo, $userId, 'Push Test ✅', 'Si ves esto, las notificaciones push funcionan correctamente.', [
+        'type' => 'test',
+        'route' => '/push-diagnostic'
+    ]);
+    
+    jsonResponse(['data' => [
+        'status' => $result ? 'sent' : 'failed',
+        'tokens_found' => $tokenCount
+    ]]);
 }

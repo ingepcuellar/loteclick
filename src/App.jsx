@@ -32,6 +32,7 @@ import DisbursementForm from './pages/Treasury/DisbursementForm';
 import UtilityList from './pages/Utilities/UtilityList';
 import UtilityForm from './pages/Utilities/UtilityForm';
 import NotificationList from './pages/Notifications/NotificationList';
+import PushDiagnostic from './pages/PushDiagnostic';
 
 // Protected Route Component
 function ProtectedRoute({ children, requiredRole }) {
@@ -153,6 +154,9 @@ function App() {
 
                                 {/* Notifications */}
                                 <Route path="/notifications" element={<NotificationList />} />
+
+                                {/* Push Diagnostic (temporary) */}
+                                <Route path="/push-diagnostic" element={<PushDiagnostic />} />
 
                                 {/* Fallback */}
                                 <Route path="*" element={<Navigate to="/" replace />} />

@@ -13,7 +13,8 @@ import {
     FiCreditCard,
     FiUserCheck,
     FiZap,
-    FiBell
+    FiBell,
+    FiSmartphone
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -105,6 +106,7 @@ function Sidebar({ isOpen, onClose }) {
             section: 'Administración',
             items: [
                 { path: '/users', icon: FiUserCheck, label: 'Usuarios', module: 'users' },
+                { path: '/push-diagnostic', icon: FiSmartphone, label: 'Push Diagnostic', module: 'users' },
             ]
         });
     }
