@@ -72,7 +72,7 @@ function Login() {
                         <img src="/logo.png" alt="PredioClick" />
                     </div>
                     <h1>PredioClick</h1>
-                    <p>Sistema de Gestión de Lotes</p>
+                    <p>Sistema de Gestión de Predios</p>
                 </div>
 
                 {/* Error Message */}

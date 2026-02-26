@@ -129,7 +129,7 @@ function Sidebar({ isOpen, onClose }) {
                 </div>
                 <div className="sidebar-brand">
                     <h1>PredioClick</h1>
-                    <span>Gestión de Lotes</span>
+                    <span>Gestión de Predios</span>
                 </div>
 
                 {/* Mobile Close Button */}

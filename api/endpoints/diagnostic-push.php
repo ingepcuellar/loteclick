@@ -1,6 +1,6 @@
 <?php
 /**
- * LoteClick - Push Notification Diagnostic
+ * PredioClick - Push Notification Diagnostic
  * Checks all components needed for push to work
  * DELETE THIS FILE AFTER DEBUGGING
  */

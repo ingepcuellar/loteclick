@@ -1,5 +1,5 @@
 -- =============================================
--- LoteClick - Migration V3
+-- PredioClick - Migration V3
 -- Commission Agents table
 -- Run this BEFORE deploying new code
 -- =============================================

@@ -1,5 +1,5 @@
 -- =============================================
--- LoteClick - Migration V4
+-- PredioClick - Migration V4
 -- Utility Registrations (Matrículas de Servicios Públicos)
 -- INDEPENDENT from project accounting
 -- =============================================

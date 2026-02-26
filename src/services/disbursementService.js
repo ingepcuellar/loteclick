@@ -1,5 +1,5 @@
 /**
- * LoteClick - Disbursement Service (PHP API)
+ * PredioClick - Disbursement Service (PHP API)
  * Entregas de dinero a socios
  */
 import { api } from '../lib/apiClient';

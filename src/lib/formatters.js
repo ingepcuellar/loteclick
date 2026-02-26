@@ -1,5 +1,5 @@
 /**
- * Shared formatting utilities for LoteClick
+ * Shared formatting utilities for PredioClick
  * Centralizes currency and date formatting to avoid duplication across components.
  */
 

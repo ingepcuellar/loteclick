@@ -1,6 +1,6 @@
 <?php
 /**
- * LoteClick API - Partner Disbursements Endpoints
+ * PredioClick API - Partner Disbursements Endpoints
  * Entregas de dinero a socios
  */
 require_once __DIR__ . '/../config.php';

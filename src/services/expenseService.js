@@ -1,5 +1,5 @@
 /**
- * LoteClick - Expense Service (PHP API)
+ * PredioClick - Expense Service (PHP API)
  */
 import { api } from '../lib/apiClient';
 

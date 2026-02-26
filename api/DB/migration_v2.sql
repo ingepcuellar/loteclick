@@ -1,5 +1,5 @@
 -- =============================================
--- LoteClick - Migration V2
+-- PredioClick - Migration V2
 -- Run this BEFORE deploying new code
 -- =============================================
 

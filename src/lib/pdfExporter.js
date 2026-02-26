@@ -1,5 +1,5 @@
 /**
- * LoteClick - PDF Exporter Utility
+ * PredioClick - PDF Exporter Utility
  * Genera reportes PDF profesionales usando jsPDF + autoTable
  */
 import jsPDF from 'jspdf';

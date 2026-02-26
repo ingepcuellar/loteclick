@@ -1,6 +1,6 @@
 <?php
 /**
- * LoteClick API - Push Notifications Endpoint
+ * PredioClick API - Push Notifications Endpoint
  * Manages device tokens for push notifications
  */
 require_once __DIR__ . '/../config.php';
@@ -46,7 +46,7 @@ function convertApnsToFcm($apnsToken) {
     
     // Get the GCM Sender ID from GoogleService-Info.plist or use project number
     // The application field should be the bundle ID
-    $bundleId = 'com.loteclick.app';
+    $bundleId = 'com.PredioClick.app';
     
     $url = "https://iid.googleapis.com/iid/v1:batchImport";
     

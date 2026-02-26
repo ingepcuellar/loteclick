@@ -1,5 +1,5 @@
 /**
- * LoteClick - Project Service (PHP API)
+ * PredioClick - Project Service (PHP API)
  */
 import { api } from '../lib/apiClient';
 

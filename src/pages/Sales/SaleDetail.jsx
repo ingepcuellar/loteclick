@@ -157,7 +157,7 @@ _________________________          _________________________
         <div class="header">
             <div>
                 <div class="logo">🏡 PredioClick</div>
-                <p style="color: #666; margin-top: 5px;">Sistema de Gestión de Loteos</p>
+                <p style="color: #666; margin-top: 5px;">Sistema de Gestión de Predios</p>
             </div>
             <div class="invoice-info">
                 <div class="invoice-number">${invoiceNumber}</div>

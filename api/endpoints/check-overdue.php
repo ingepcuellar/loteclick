@@ -1,6 +1,6 @@
 <?php
 /**
- * LoteClick API - Check Overdue Installments & Generate Notifications
+ * PredioClick API - Check Overdue Installments & Generate Notifications
  * Revisa cuotas vencidas y crea notificaciones automáticas
  */
 require_once __DIR__ . '/../config.php';

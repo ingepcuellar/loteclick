@@ -1,6 +1,6 @@
 <?php
 /**
- * LoteClick API - Utility Registrations Endpoints
+ * PredioClick API - Utility Registrations Endpoints
  * Matrículas de Servicios Públicos (Agua, Energía, Gas)
  * INDEPENDENT from project accounting
  */

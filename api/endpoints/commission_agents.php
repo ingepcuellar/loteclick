@@ -1,6 +1,6 @@
 <?php
 /**
- * LoteClick API - Commission Agents Endpoints
+ * PredioClick API - Commission Agents Endpoints
  */
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../jwt.php';

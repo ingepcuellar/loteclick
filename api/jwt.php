@@ -1,6 +1,6 @@
 <?php
 /**
- * LoteClick API - JWT Authentication
+ * PredioClick API - JWT Authentication
  */
 
 require_once __DIR__ . '/config.php';

@@ -1,5 +1,5 @@
 /**
- * LoteClick - API Client
+ * PredioClick - API Client
  * Replaces supabaseClient.js, handles all HTTP requests to PHP backend with JWT auth.
  */
 

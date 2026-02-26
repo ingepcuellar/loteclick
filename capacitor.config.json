@@ -9,7 +9,7 @@
     "ios": {
         "contentInset": "automatic",
         "preferredContentMode": "mobile",
-        "scheme": "LoteClick",
+        "scheme": "PredioClick",
         "scrollEnabled": true,
         "allowsLinkPreview": false
     },

@@ -1,6 +1,6 @@
 <?php
 /**
- * LoteClick API - Configuration
+ * PredioClick API - Configuration
  */
 
 // Error reporting (disable in production)
@@ -11,10 +11,10 @@ ini_set('display_errors', 0);
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'lotecdc1_DB');
 define('DB_USER', 'lotecdc1_admin');
-define('DB_PASS', 'LoteClick2026*+');
+define('DB_PASS', 'PredioClick2026*+');
 
 // JWT Secret - CHANGE THIS IN PRODUCTION
-define('JWT_SECRET', 'loteclick_jwt_secret_key_change_this_2024');
+define('JWT_SECRET', 'PredioClick_jwt_secret_key_change_this_2024');
 define('JWT_EXPIRY', 86400 * 7); // 7 days
 
 // Upload settings

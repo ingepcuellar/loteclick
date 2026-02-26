@@ -1,5 +1,5 @@
 /**
- * LoteClick - Auth Service (PHP API)
+ * PredioClick - Auth Service (PHP API)
  */
 import { api, setToken } from '../lib/apiClient';
 

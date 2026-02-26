@@ -1,6 +1,6 @@
 <?php
 /**
- * LoteClick API - File Upload Endpoint
+ * PredioClick API - File Upload Endpoint
  */
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../jwt.php';

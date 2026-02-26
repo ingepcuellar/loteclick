@@ -1,5 +1,5 @@
 -- =============================================
--- LoteClick - MySQL Schema
+-- PredioClick - MySQL Schema
 -- =============================================
 
 CREATE TABLE IF NOT EXISTS profiles (
@@ -146,7 +146,7 @@ CREATE INDEX idx_installments_due ON installments(due_date);
 INSERT INTO profiles (id, name, email, password, role, is_active) VALUES (
     UUID(),
     'Administrador',
-    'admin@loteclick.com',
+    'admin@PredioClick.com',
     '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
     'admin',
     1

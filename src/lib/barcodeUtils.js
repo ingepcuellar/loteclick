@@ -1,5 +1,5 @@
 /**
- * LoteClick - Barcode Utilities
+ * PredioClick - Barcode Utilities
  * Generación de códigos de barras y documentos imprimibles
  */
 import JsBarcode from 'jsbarcode';
@@ -228,7 +228,7 @@ export function generatePaymentSlipHTML({ sale, client, project, installments })
     </div>
 
     <div class="footer">
-        <p>PredioClick - Sistema de Gestión de Loteos</p>
+        <p>PredioClick - Sistema de Gestión de Predios</p>
         <p>Documento generado el ${fmtDate(new Date().toISOString())}</p>
     </div>
 </div>
@@ -317,7 +317,7 @@ export function generatePaymentReceiptHTML({ payment, sale, client, project }) {
     </div>
 
     <div class="footer">
-        <p>PredioClick - Sistema de Gestión de Loteos</p>
+        <p>PredioClick - Sistema de Gestión de Predios</p>
         <p>Documento generado el ${fmtDate(new Date().toISOString())}</p>
     </div>
 </div>

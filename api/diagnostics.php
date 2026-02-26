@@ -6,7 +6,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-echo "<h2>LoteClick API Diagnostics</h2>";
+echo "<h2>PredioClick API Diagnostics</h2>";
 
 // Test 1: Config loads
 echo "<h3>1. Loading config...</h3>";
