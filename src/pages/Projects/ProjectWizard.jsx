@@ -415,6 +415,9 @@ function ProjectWizard() {
                                 <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--spacing-4)' }}>
                                     Aplica el mismo área y precio a todos los lotes disponibles
                                 </p>
+                                <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', marginBottom: 'var(--spacing-2)' }}>
+                                    💡 Puedes personalizar el nombre de cada lote (ej: Mz A - Lt 1)
+                                </p>
                                 <div className="form-row" style={{ alignItems: 'flex-end' }}>
                                     <div className="form-group" style={{ marginBottom: 0 }}>
                                         <label className="form-label">Área (m²)</label>
@@ -481,7 +484,15 @@ function ProjectWizard() {
                                         {formData.lots.map((lot, index) => (
                                             <tr key={lot.id}>
                                                 <td>
-                                                    <strong>Lote {lot.number}</strong>
+                                                    <input
+                                                        type="text"
+                                                        className="form-input"
+                                                        value={lot.number}
+                                                        onChange={(e) => updateLot(index, 'number', e.target.value)}
+                                                        disabled={lot.status === 'sold'}
+                                                        style={{ width: '160px', fontWeight: 600 }}
+                                                        placeholder="Ej: Mz A - Lt 1"
+                                                    />
                                                 </td>
                                                 <td>
                                                     <input

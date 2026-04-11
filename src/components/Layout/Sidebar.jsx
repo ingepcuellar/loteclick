@@ -7,7 +7,7 @@ import {
     FiShoppingCart,
     FiDollarSign,
     FiBarChart2,
-
+    FiFileText,
     FiX,
     FiCreditCard,
     FiUserCheck,
@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { brand } from '../../config/brandConfig';
 import { notificationService } from '../../services/notificationService';
 
 function Sidebar({ isOpen, onClose }) {
@@ -61,7 +62,7 @@ function Sidebar({ isOpen, onClose }) {
             items: [
                 { path: '/projects', icon: FiFolder, label: 'Proyectos', badge: stats.totalProjects, module: 'projects' },
                 { path: '/clients', icon: FiUsers, label: 'Clientes', badge: stats.totalClients, module: 'clients' },
-                { path: '/sales', icon: FiShoppingCart, label: 'Ventas', badge: stats.totalSales, module: 'sales' },
+                ...(isAdmin() ? [{ path: '/sales', icon: FiShoppingCart, label: 'Ventas', badge: stats.totalSales, module: 'sales' }] : []),
                 { path: '/expenses', icon: FiDollarSign, label: 'Gastos', module: 'expenses' },
             ]
         },
@@ -97,6 +98,12 @@ function Sidebar({ isOpen, onClose }) {
                 { path: '/reports', icon: FiBarChart2, label: 'Reportes', module: 'reports' },
             ]
         },
+        {
+            section: 'Configuración',
+            items: [
+                { path: '/contract-params', icon: FiFileText, label: 'Parámetros de Contrato', module: 'contract_params' },
+            ]
+        },
     ];
 
     // Add admin section if user is admin
@@ -125,11 +132,11 @@ function Sidebar({ isOpen, onClose }) {
             {/* Header */}
             <div className="sidebar-header">
                 <div className="sidebar-logo">
-                    <img src="/logo.png" alt="PredioClick" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <img src={brand.logo} alt={brand.appName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
                 <div className="sidebar-brand">
-                    <h1>PredioClick</h1>
-                    <span>Gestión de Predios</span>
+                    <h1>{brand.appName}</h1>
+                    <span>{brand.subtitle}</span>
                 </div>
 
                 {/* Mobile Close Button */}

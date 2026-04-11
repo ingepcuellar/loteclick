@@ -10,7 +10,8 @@ import {
     FiDollarSign,
     FiFolder,
     FiCalendar,
-    FiTag
+    FiTag,
+    FiImage
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency, formatDate } from '../../lib/formatters';
@@ -186,6 +187,7 @@ function ExpenseList() {
                                             <th>Proyecto</th>
                                             <th>Categoría</th>
                                             <th>Fecha</th>
+                                            <th>Adjunto</th>
                                             <th style={{ textAlign: 'right' }}>Monto</th>
                                             <th style={{ textAlign: 'center' }}>Acciones</th>
                                         </tr>
@@ -230,6 +232,15 @@ function ExpenseList() {
                                                             {formatDate(expense.date || expense.createdAt)}
                                                         </div>
                                                     </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        {expense.attachment ? (
+                                                            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
+                                                                <FiImage /> Sí
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{ color: 'var(--text-secondary)' }}>-</span>
+                                                        )}
+                                                    </td>
                                                     <td style={{ textAlign: 'right', fontWeight: 600, color: '#ef4444' }}>
                                                         {formatCurrency(expense.amount)}
                                                     </td>
@@ -264,7 +275,7 @@ function ExpenseList() {
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <td colSpan="4" style={{ textAlign: 'right', fontWeight: 600 }}>
+                                            <td colSpan="5" style={{ textAlign: 'right', fontWeight: 600 }}>
                                                 Total:
                                             </td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, color: '#ef4444', fontSize: '1.1rem' }}>
@@ -308,6 +319,16 @@ function ExpenseList() {
                                                 <div className="mobile-card-row">
                                                     <span className="mobile-card-label">Fecha</span>
                                                     <span className="mobile-card-value">{formatDate(expense.date || expense.createdAt)}</span>
+                                                </div>
+                                                <div className="mobile-card-row">
+                                                    <span className="mobile-card-label">Adjunto</span>
+                                                    <span className="mobile-card-value">
+                                                        {expense.attachment ? (
+                                                            <span className="badge badge-info" style={{ fontSize: 'var(--font-size-xs)' }}>
+                                                                <FiImage /> Sí
+                                                            </span>
+                                                        ) : 'Sin adjunto'}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </Link>

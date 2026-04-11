@@ -1,5 +1,5 @@
 /**
- * PredioClick - Installment Service (PHP API)
+ * LoteClick - Installment Service (PHP API)
  */
 import { api } from '../lib/apiClient';
 
@@ -8,13 +8,14 @@ export const installmentService = {
         return api.get(`endpoints/installments.php?action=bySale&saleId=${saleId}`);
     },
 
-    async generateInstallments(saleId, totalAmount, numInstallments, startDate, downPayment = 0) {
+    async generateInstallments(saleId, totalAmount, numInstallments, startDate, downPayment = 0, separeAmount = 0) {
         return api.post('endpoints/installments.php?action=generate', {
             saleId,
             totalAmount,
             numInstallments,
             startDate,
-            downPayment
+            downPayment,
+            separeAmount
         });
     },
 

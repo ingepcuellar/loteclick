@@ -25,6 +25,17 @@ function ClientDetail() {
     const client = getClientById(id);
     const clientSales = getSalesByClient(id);
 
+    if (state.isLoading) {
+        return (
+            <div className="card">
+                <div className="empty-state" style={{ padding: '3rem' }}>
+                    <div className="spinner"></div>
+                    <h3 style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Cargando datos del cliente...</h3>
+                </div>
+            </div>
+        );
+    }
+
     if (!client) {
         return (
             <div className="card">

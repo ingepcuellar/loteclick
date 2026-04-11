@@ -17,6 +17,36 @@ export const ROLE_LABELS = {
     partner: 'Socio'
 };
 
+export const ROLE_ICONS = {
+    admin: '🔐',
+    seller: '💼',
+    treasurer: '💰',
+    partner: '🤝'
+};
+
+/**
+ * Normalizes role data from various formats into a consistent array.
+ * Handles: string ("seller"), legacy combo ("seller_treasurer"), JSON array, or actual array.
+ */
+export function getRolesArray(profile) {
+    const raw = profile?.roles || profile?.role;
+    if (!raw) return ['seller'];
+
+    // Already an array
+    if (Array.isArray(raw)) return raw;
+
+    // Try JSON parse (stored as JSON string in DB)
+    if (typeof raw === 'string' && raw.startsWith('[')) {
+        try { return JSON.parse(raw); } catch { /* fall through */ }
+    }
+
+    // Legacy combo role
+    if (raw === 'seller_treasurer') return ['seller', 'treasurer'];
+
+    // Simple string
+    return [raw];
+}
+
 // Permissions by module
 export const PERMISSIONS = {
     dashboard: {
@@ -40,7 +70,7 @@ export const PERMISSIONS = {
     sales: {
         admin: ['view', 'create', 'edit', 'delete'],
         seller: ['view', 'create', 'edit', 'delete'],
-        treasurer: [],
+        treasurer: ['view', 'create', 'edit', 'delete'],
         partner: ['view_own']
     },
     payments: {
@@ -68,10 +98,16 @@ export const PERMISSIONS = {
         partner: ['view_own']
     },
     reports: {
-        admin: ['view', 'all'],
+        admin: ['view'],
         seller: [],
-        treasurer: [],
+        treasurer: ['view'],
         partner: ['view_own']
+    },
+    contract_params: {
+        admin: ['view', 'edit'],
+        seller: ['view', 'edit'],
+        treasurer: ['view', 'edit'],
+        partner: []
     },
     users: {
         admin: ['view', 'create', 'edit', 'delete'],
@@ -235,7 +271,7 @@ export function AuthProvider({ children }) {
                 });
 
                 // Load all users if admin
-                if (profile.role === 'admin') {
+                if (getRolesArray(profile).includes('admin')) {
                     const { data: users } = await authService.getAllUsers();
                     if (users) {
                         dispatch({ type: ACTIONS.SET_USERS, payload: users });
@@ -276,7 +312,7 @@ export function AuthProvider({ children }) {
             });
 
             // Load users list if admin
-            if (data.user.role === 'admin') {
+            if (getRolesArray(data.user).includes('admin')) {
                 const { data: users } = await authService.getAllUsers();
                 if (users) {
                     dispatch({ type: ACTIONS.SET_USERS, payload: users });
@@ -369,43 +405,52 @@ export function AuthProvider({ children }) {
     }, [state.users]);
 
     const getUsersByRole = useCallback((role) => {
-        return state.users.filter(u => u.role === role);
+        return state.users.filter(u => getRolesArray(u).includes(role));
     }, [state.users]);
 
     const hasPermission = useCallback((module, action) => {
-        const role = state.profile?.role || state.currentUser?.role;
-        if (!role) return false;
+        const userRoles = getRolesArray(state.profile || state.currentUser);
+        if (!userRoles.length) return false;
 
-        const rolePermissions = PERMISSIONS[module]?.[role] || [];
-        return rolePermissions.includes(action) || rolePermissions.includes('all');
+        // Merge permissions from all assigned roles
+        const allPerms = new Set();
+        for (const r of userRoles) {
+            const perms = PERMISSIONS[module]?.[r] || [];
+            perms.forEach(p => allPerms.add(p));
+        }
+        return allPerms.has(action) || allPerms.has('all');
     }, [state.profile, state.currentUser]);
 
     const canAccessModule = useCallback((module) => {
-        const role = state.profile?.role || state.currentUser?.role;
-        if (!role) return false;
+        const userRoles = getRolesArray(state.profile || state.currentUser);
+        if (!userRoles.length) return false;
 
-        const rolePermissions = PERMISSIONS[module]?.[role] || [];
-        return rolePermissions.length > 0;
+        // Check if any assigned role has permissions for this module
+        for (const r of userRoles) {
+            const perms = PERMISSIONS[module]?.[r] || [];
+            if (perms.length > 0) return true;
+        }
+        return false;
     }, [state.profile, state.currentUser]);
 
     const isAdmin = useCallback(() => {
-        const role = state.profile?.role || state.currentUser?.role;
-        return role === ROLES.ADMIN;
+        const userRoles = getRolesArray(state.profile || state.currentUser);
+        return userRoles.includes(ROLES.ADMIN);
     }, [state.profile, state.currentUser]);
 
     const isPartner = useCallback(() => {
-        const role = state.profile?.role || state.currentUser?.role;
-        return role === ROLES.PARTNER;
+        const userRoles = getRolesArray(state.profile || state.currentUser);
+        return userRoles.includes(ROLES.PARTNER);
     }, [state.profile, state.currentUser]);
 
     const isTreasurer = useCallback(() => {
-        const role = state.profile?.role || state.currentUser?.role;
-        return role === ROLES.TREASURER;
+        const userRoles = getRolesArray(state.profile || state.currentUser);
+        return userRoles.includes(ROLES.TREASURER);
     }, [state.profile, state.currentUser]);
 
     const isSeller = useCallback(() => {
-        const role = state.profile?.role || state.currentUser?.role;
-        return role === ROLES.SELLER;
+        const userRoles = getRolesArray(state.profile || state.currentUser);
+        return userRoles.includes(ROLES.SELLER);
     }, [state.profile, state.currentUser]);
 
     const getAssociatedProjects = useCallback(() => {
@@ -437,9 +482,11 @@ export function AuthProvider({ children }) {
         isTreasurer,
         isSeller,
         getAssociatedProjects,
+        getRolesArray,
         // Constants
         ROLES,
-        ROLE_LABELS
+        ROLE_LABELS,
+        ROLE_ICONS
     };
 
     return (

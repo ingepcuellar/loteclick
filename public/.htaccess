@@ -1,7 +1,19 @@
+# Forzar MIME types correctos (evita error de MIME type en módulos JS)
+<IfModule mod_mime.c>
+  AddType application/javascript .js .mjs
+  AddType text/css .css
+  AddType image/svg+xml .svg
+  AddType application/json .json
+  AddType application/wasm .wasm
+</IfModule>
+
 # Redirigir todas las rutas a index.html (para React Router)
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+  
+  # No reescribir la carpeta API
+  RewriteRule ^api/ - [L]
   
   # No reescribir archivos o directorios existentes
   RewriteCond %{REQUEST_FILENAME} !-f

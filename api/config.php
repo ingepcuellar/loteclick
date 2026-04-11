@@ -1,6 +1,6 @@
 <?php
 /**
- * PredioClick API - Configuration
+ * LoteClick API - Configuration
  */
 
 // Error reporting (disable in production)

@@ -1,5 +1,5 @@
 /**
- * PredioClick - Notification Service (PHP API)
+ * LoteClick - Notification Service (PHP API)
  */
 import { api } from '../lib/apiClient';
 

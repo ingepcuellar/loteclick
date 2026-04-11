@@ -1,6 +1,6 @@
 <?php
 /**
- * PredioClick API - Notification Diagnostic
+ * LoteClick API - Notification Diagnostic
  * TEMPORARY - Remove after debugging
  */
 require_once __DIR__ . '/../config.php';

@@ -1,7 +1,8 @@
 /**
- * PredioClick - API Client
- * Replaces supabaseClient.js, handles all HTTP requests to PHP backend with JWT auth.
+ * White-Label - API Client
+ * Handles all HTTP requests to PHP backend with JWT auth.
  */
+import { brand } from '../config/brandConfig';
 
 const API_BASE = import.meta.env.VITE_API_URL || './api';
 
@@ -9,7 +10,7 @@ const API_BASE = import.meta.env.VITE_API_URL || './api';
  * Get stored JWT token
  */
 function getToken() {
-    return localStorage.getItem('loteclick_token');
+    return localStorage.getItem(brand.tokenKey);
 }
 
 /**
@@ -17,9 +18,9 @@ function getToken() {
  */
 export function setToken(token) {
     if (token) {
-        localStorage.setItem('loteclick_token', token);
+        localStorage.setItem(brand.tokenKey, token);
     } else {
-        localStorage.removeItem('loteclick_token');
+        localStorage.removeItem(brand.tokenKey);
     }
 }
 

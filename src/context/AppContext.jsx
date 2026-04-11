@@ -225,11 +225,14 @@ export function AppProvider({ children }) {
             return;
         }
 
-        const loadData = async () => {
-            console.log('[AppContext] Starting to load data...');
-            dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+        refreshData();
+    }, [authLoading, isAuthenticated, initialized]); // eslint-disable-line react-hooks/exhaustive-deps
 
-            try {
+    const refreshData = useCallback(async () => {
+        console.log('[AppContext] Starting to load data...');
+        dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+
+        try {
                 console.log('[AppContext] Fetching from API...');
                 const [projectsRes, clientsRes, salesRes, paymentsRes, expensesRes, utilityRes] = await Promise.all([
                     projectService.getAll(),
@@ -281,6 +284,7 @@ export function AppProvider({ children }) {
                         paymentDate: payment.payment_date || payment.paymentDate,
                         saleId: payment.sale_id || payment.saleId,
                         receiptImage: payment.receipt_image || payment.receiptImage,
+                        paymentMethod: payment.payment_method || payment.paymentMethod || 'cash',
                         createdAt: payment.created_at || payment.createdAt
                     }));
                 };
@@ -291,6 +295,8 @@ export function AppProvider({ children }) {
                         projectId: expense.project_id || expense.projectId,
                         partnerId: expense.partner_id || expense.partnerId,
                         date: expense.expense_date || expense.date,
+                        attachment: expense.attachment || null,
+                        selectedLots: expense.selected_lots ? (typeof expense.selected_lots === 'string' ? JSON.parse(expense.selected_lots) : expense.selected_lots) : null,
                         createdAt: expense.created_at || expense.createdAt
                     }));
                 };
@@ -324,10 +330,7 @@ export function AppProvider({ children }) {
             }
 
             setInitialized(true);
-        };
-
-        loadData();
-    }, [authLoading, isAuthenticated]);
+    }, [isAuthenticated]);
 
     // Helper Functions
     const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -464,12 +467,14 @@ export function AppProvider({ children }) {
 
             try {
                 const downPaymentAmount = parseFloat(sale.downPayment || 0);
+                const separeAmount = parseFloat(sale.separeAmount || 0);
                 const { error: installmentError } = await installmentService.generateInstallments(
                     data.id,
                     totalAfterDownPayment,
                     sale.numberOfInstallments,
                     startDate,
-                    downPaymentAmount
+                    downPaymentAmount,
+                    separeAmount
                 );
                 if (installmentError) {
                     console.error('Error generating installments:', installmentError);
@@ -536,7 +541,9 @@ export function AppProvider({ children }) {
         const normalizedPayment = {
             ...data,
             paymentDate: data.payment_date || data.paymentDate,
-            saleId: data.sale_id || data.saleId
+            saleId: data.sale_id || data.saleId,
+            receiptImage: data.receipt_image || data.receiptImage || null,
+            paymentMethod: data.payment_method || data.paymentMethod || 'cash'
         };
         dispatch({ type: ACTIONS.ADD_PAYMENT, payload: normalizedPayment });
         return normalizedPayment;
@@ -588,14 +595,23 @@ export function AppProvider({ children }) {
             category: expense.category,
             expense_date: expense.date || new Date().toISOString().split('T')[0],
             notes: expense.notes,
+            attachment: expense.attachment || null,
+            selected_lots: expense.selectedLots ? JSON.stringify(expense.selectedLots) : null,
         };
         const { data, error } = await expenseService.create(expenseData);
         if (error) {
             console.error('Error creating expense:', error);
             return null;
         }
-        dispatch({ type: ACTIONS.ADD_EXPENSE, payload: data });
-        return data;
+        const normalizedData = {
+            ...data,
+            projectId: data.project_id || data.projectId,
+            partnerId: data.partner_id || data.partnerId,
+            date: data.expense_date || data.date,
+            createdAt: data.created_at || data.createdAt
+        };
+        dispatch({ type: ACTIONS.ADD_EXPENSE, payload: normalizedData });
+        return normalizedData;
     }, []);
 
     const updateExpense = useCallback(async (expense) => {
@@ -604,7 +620,14 @@ export function AppProvider({ children }) {
             console.error('Error updating expense:', error);
             return;
         }
-        dispatch({ type: ACTIONS.UPDATE_EXPENSE, payload: data });
+        const normalizedData = {
+            ...data,
+            projectId: data.project_id || data.projectId,
+            partnerId: data.partner_id || data.partnerId,
+            date: data.expense_date || data.date,
+            createdAt: data.created_at || data.createdAt
+        };
+        dispatch({ type: ACTIONS.UPDATE_EXPENSE, payload: normalizedData });
     }, []);
 
     const deleteExpense = useCallback(async (expenseId) => {
@@ -689,38 +712,7 @@ export function AppProvider({ children }) {
         };
     }, [state]);
 
-    // ============================================
-    // REFRESH DATA
-    // ============================================
-    const refreshData = useCallback(async () => {
-        dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
-        try {
-            const [projectsRes, clientsRes, salesRes, paymentsRes, expensesRes, utilityRes] = await Promise.all([
-                projectService.getAll(),
-                clientService.getAll(),
-                saleService.getAll(),
-                paymentService.getAll(),
-                expenseService.getAll(),
-                utilityService.getAll(),
-            ]);
-
-            dispatch({
-                type: ACTIONS.LOAD_STATE,
-                payload: {
-                    projects: projectsRes.data || [],
-                    clients: clientsRes.data || [],
-                    sales: salesRes.data || [],
-                    payments: paymentsRes.data || [],
-                    expenses: expensesRes.data || [],
-                    utilityRegistrations: utilityRes.data || [],
-                }
-            });
-        } catch (error) {
-            console.error('Error refreshing data:', error);
-            dispatch({ type: ACTIONS.SET_ERROR, payload: error.message });
-        }
-    }, []);
 
     const value = {
         state,

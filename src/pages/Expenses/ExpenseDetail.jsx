@@ -9,7 +9,11 @@ import {
     FiCalendar,
     FiUser,
     FiFileText,
-    FiClock
+    FiClock,
+    FiImage,
+    FiGrid,
+    FiDownload,
+    FiAlertCircle
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { useState } from 'react';
@@ -17,7 +21,7 @@ import { formatCurrency, formatDateLong as formatDate } from '../../lib/formatte
 
 const EXPENSE_CATEGORIES = {
     commissions: { label: 'Comisiones', color: '#f97316' },
-    signatures: { label: 'Firmas', color: '#6366f1' },
+    signatures: { label: 'Firmas y Escrituras', color: '#6366f1' },
     construction: { label: 'Obras', color: '#3b82f6' },
     utilities_water: { label: 'Agua', color: '#06b6d4' },
     utilities_energy: { label: 'Energía', color: '#eab308' },
@@ -35,8 +39,9 @@ const EXPENSE_CATEGORIES = {
 function ExpenseDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { getExpenseById, getProjectById, deleteExpense } = useApp();
+    const { getExpenseById, getProjectById, deleteExpense, state } = useApp();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showAttachmentModal, setShowAttachmentModal] = useState(false);
 
     const expense = getExpenseById(id);
 
@@ -56,14 +61,29 @@ function ExpenseDetail() {
     }
 
     const project = getProjectById(expense.projectId);
-    const partner = project?.partners?.find(p => p.id === expense.partnerId);
+    const partner = expense.partnerId === 'office'
+        ? { name: '🏢 Oficina', percentage: null }
+        : project?.partners?.find(p => p.id === expense.partnerId);
     const category = EXPENSE_CATEGORIES[expense.category] || EXPENSE_CATEGORIES.other;
 
-
+    // Parse selected lots
+    const selectedLots = expense.selectedLots || [];
 
     const handleDelete = () => {
         deleteExpense(id);
         navigate('/expenses');
+    };
+
+    // Find lot info
+    const getLotInfo = (lotId) => {
+        const lot = project?.lots?.find(l => l.id === lotId);
+        if (!lot) return null;
+        const sale = state.sales.find(s =>
+            (s.projectId === expense.projectId || s.project_id === expense.projectId) &&
+            (s.lotId === lotId || s.lot_id === lotId)
+        );
+        const client = sale ? state.clients.find(c => c.id === sale.clientId) : null;
+        return { lot, sale, client };
     };
 
     return (
@@ -156,16 +176,16 @@ function ExpenseDetail() {
                             </div>
                         </div>
 
-                        {/* Partner */}
+                        {/* Partner / Responsible */}
                         <div className="info-item">
                             <div className="info-label">
                                 <FiUser style={{ marginRight: '0.5rem', color: '#8b5cf6' }} />
-                                Socio Responsable
+                                Responsable del Gasto
                             </div>
                             <div className="info-value">
                                 {partner ? (
                                     <span>
-                                        {partner.name} <span style={{ color: 'var(--text-secondary)' }}>({partner.percentage}%)</span>
+                                        {partner.name} {partner.percentage != null && <span style={{ color: 'var(--text-secondary)' }}>({partner.percentage}%)</span>}
                                     </span>
                                 ) : (
                                     <span style={{ color: 'var(--text-secondary)' }}>Sin asignar</span>
@@ -183,7 +203,69 @@ function ExpenseDetail() {
                                 {formatDate(expense.createdAt)}
                             </div>
                         </div>
+
+                        {/* Attachment */}
+                        <div className="info-item">
+                            <div className="info-label">
+                                <FiImage style={{ marginRight: '0.5rem', color: '#3b82f6' }} />
+                                Adjunto
+                            </div>
+                            <div className="info-value">
+                                {expense.attachment ? (
+                                    <button
+                                        className="btn btn-sm btn-secondary"
+                                        onClick={() => setShowAttachmentModal(true)}
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                        <FiImage /> Ver Adjunto
+                                    </button>
+                                ) : (
+                                    <span style={{ color: 'var(--text-secondary)' }}>Sin adjunto</span>
+                                )}
+                            </div>
+                        </div>
                     </div>
+
+                    {/* Selected Lots for Signatures */}
+                    {expense.category === 'signatures' && selectedLots.length > 0 && (
+                        <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
+                            <div className="info-label" style={{ marginBottom: '0.75rem' }}>
+                                <FiGrid style={{ marginRight: '0.5rem' }} />
+                                Lotes con Escritura ({selectedLots.length})
+                            </div>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                                gap: '0.75rem'
+                            }}>
+                                {selectedLots.map((sl, idx) => {
+                                    const info = getLotInfo(sl.lotId);
+                                    return (
+                                        <div key={sl.lotId || idx} style={{
+                                            padding: '0.75rem 1rem',
+                                            border: `1px solid ${sl.isFallen ? '#f9731640' : 'var(--border-color)'}`,
+                                            borderRadius: 'var(--radius-md)',
+                                            background: sl.isFallen ? 'rgba(249, 115, 22, 0.05)' : 'var(--bg-secondary)',
+                                        }}>
+                                            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                                                Lote #{info?.lot?.number || '?'}
+                                            </div>
+                                            {info?.client && (
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                    {info.client.name || info.client.fullName}
+                                                </div>
+                                            )}
+                                            {sl.isFallen && (
+                                                <div style={{ fontSize: '0.8rem', color: '#f97316', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                    <FiAlertCircle /> Venta caída — Solo autenticación ($10.000)
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Notes */}
                     {expense.notes && (
@@ -205,6 +287,59 @@ function ExpenseDetail() {
                     )}
                 </div>
             </div>
+
+            {/* Attachment Image Modal */}
+            {showAttachmentModal && expense.attachment && (
+                <div className="modal-overlay" onClick={() => setShowAttachmentModal(false)}>
+                    <div
+                        className="modal modal-lg"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+                    >
+                        <div className="modal-header">
+                            <h3 className="modal-title">
+                                <FiImage style={{ marginRight: '8px' }} />
+                                Adjunto del Gasto
+                            </h3>
+                            <button className="modal-close" onClick={() => setShowAttachmentModal(false)}>×</button>
+                        </div>
+                        <div className="modal-body" style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            background: 'var(--bg-tertiary)',
+                            padding: 'var(--spacing-4)',
+                            maxHeight: '70vh',
+                            overflow: 'auto'
+                        }}>
+                            <img
+                                src={expense.attachment}
+                                alt="Adjunto del gasto"
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '100%',
+                                    objectFit: 'contain',
+                                    borderRadius: 'var(--radius-lg)',
+                                    boxShadow: 'var(--shadow-lg)'
+                                }}
+                            />
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowAttachmentModal(false)}>
+                                Cerrar
+                            </button>
+                            <a
+                                href={expense.attachment}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-primary"
+                            >
+                                <FiDownload /> Abrir en nueva pestaña
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Delete Modal */}
             {showDeleteModal && (

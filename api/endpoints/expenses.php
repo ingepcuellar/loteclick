@@ -1,6 +1,6 @@
 <?php
 /**
- * PredioClick API - Expenses Endpoints
+ * LoteClick API - Expenses Endpoints
  */
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../jwt.php';
@@ -104,20 +104,36 @@ function createExpense() {
     $id = generateUUID();
 
     $stmt = $pdo->prepare(
-        "INSERT INTO expenses (id, project_id, partner_id, description, amount, category, expense_date, notes, attachment) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO expenses (id, project_id, partner_id, description, amount, category, expense_date, notes, attachment, selected_lots) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
-    $stmt->execute([
-        $id,
-        $body['project_id'] ?? $body['projectId'],
-        $body['partner_id'] ?? $body['partnerId'] ?? null,
-        $body['description'],
-        floatval($body['amount'] ?? 0),
-        $body['category'] ?? 'other',
-        $body['expense_date'] ?? $body['date'] ?? date('Y-m-d'),
-        $body['notes'] ?? null,
-        $body['attachment'] ?? null
-    ]);
+    
+    $partnerId = $body['partner_id'] ?? $body['partnerId'] ?? null;
+    if ($partnerId === 'office' || $partnerId === '') $partnerId = null;
+    
+    $selectedLots = null;
+    if (isset($body['selected_lots'])) {
+        $selectedLots = is_string($body['selected_lots']) ? $body['selected_lots'] : json_encode($body['selected_lots']);
+    } elseif (isset($body['selectedLots'])) {
+        $selectedLots = is_string($body['selectedLots']) ? $body['selectedLots'] : json_encode($body['selectedLots']);
+    }
+    
+    try {
+        $stmt->execute([
+            $id,
+            $body['project_id'] ?? $body['projectId'],
+            $partnerId,
+            $body['description'],
+            floatval($body['amount'] ?? 0),
+            $body['category'] ?? 'other',
+            $body['expense_date'] ?? $body['date'] ?? date('Y-m-d'),
+            $body['notes'] ?? null,
+            $body['attachment'] ?? null,
+            $selectedLots
+        ]);
+    } catch (PDOException $e) {
+        jsonError('Error guardando gasto: ' . $e->getMessage(), 500);
+    }
 
     $stmt = $pdo->prepare("SELECT * FROM expenses WHERE id = ?");
     $stmt->execute([$id]);
@@ -129,20 +145,35 @@ function updateExpense($id) {
     $pdo = getConnection();
     $body = getJsonBody();
 
+    $selectedLots = null;
+    if (isset($body['selected_lots'])) {
+        $selectedLots = is_string($body['selected_lots']) ? $body['selected_lots'] : json_encode($body['selected_lots']);
+    } elseif (isset($body['selectedLots'])) {
+        $selectedLots = is_string($body['selectedLots']) ? $body['selectedLots'] : json_encode($body['selectedLots']);
+    }
+
+    $partnerId = $body['partner_id'] ?? $body['partnerId'] ?? null;
+    if ($partnerId === 'office' || $partnerId === '') $partnerId = null;
+
     $stmt = $pdo->prepare(
-        "UPDATE expenses SET project_id = ?, partner_id = ?, description = ?, amount = ?, category = ?, expense_date = ?, notes = ?, attachment = ? WHERE id = ?"
+        "UPDATE expenses SET project_id = ?, partner_id = ?, description = ?, amount = ?, category = ?, expense_date = ?, notes = ?, attachment = ?, selected_lots = ? WHERE id = ?"
     );
-    $stmt->execute([
-        $body['project_id'] ?? $body['projectId'],
-        $body['partner_id'] ?? $body['partnerId'] ?? null,
-        $body['description'],
-        floatval($body['amount'] ?? 0),
-        $body['category'] ?? 'other',
-        $body['expense_date'] ?? $body['date'],
-        $body['notes'] ?? null,
-        $body['attachment'] ?? null,
-        $id
-    ]);
+    try {
+        $stmt->execute([
+            $body['project_id'] ?? $body['projectId'],
+            $partnerId,
+            $body['description'],
+            floatval($body['amount'] ?? 0),
+            $body['category'] ?? 'other',
+            $body['expense_date'] ?? $body['date'],
+            $body['notes'] ?? null,
+            $body['attachment'] ?? null,
+            $selectedLots,
+            $id
+        ]);
+    } catch (PDOException $e) {
+        jsonError('Error actualizando gasto: ' . $e->getMessage(), 500);
+    }
 
     $stmt = $pdo->prepare("SELECT * FROM expenses WHERE id = ?");
     $stmt->execute([$id]);

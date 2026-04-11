@@ -1,16 +1,17 @@
 /**
- * PredioClick - Barcode Utilities
+ * White-Label - Barcode Utilities
  * Generación de códigos de barras y documentos imprimibles
  */
 import JsBarcode from 'jsbarcode';
+import { brand } from '../config/brandConfig';
 
 /**
  * Genera un código de barras basado en el ID de venta
  * Formato: LCK-{8 primeros caracteres del UUID}
  */
 export function generateBarcodeValue(id) {
-    if (!id) return 'LCK-00000000';
-    return `LCK-${id.substring(0, 8).toUpperCase()}`;
+    if (!id) return `${brand.barcodePrefix}-00000000`;
+    return `${brand.barcodePrefix}-${id.substring(0, 8).toUpperCase()}`;
 }
 
 /**
@@ -20,7 +21,8 @@ export function generateBarcodeValue(id) {
 export function parseBarcodeInput(input) {
     if (!input) return null;
     const cleaned = input.trim().toUpperCase();
-    const match = cleaned.match(/^LCK-([A-Z0-9]{8})$/);
+    const pattern = new RegExp(`^${brand.barcodePrefix}-([A-Z0-9]{8})$`);
+    const match = cleaned.match(pattern);
     return match ? match[1] : null;
 }
 
@@ -173,7 +175,7 @@ export function generatePaymentSlipHTML({ sale, client, project, installments })
 <div class="doc-container">
     <div class="header">
         <div>
-            <div class="logo">🏡 PredioClick</div>
+            <div class="logo">${brand.emoji} ${brand.appName}</div>
             <div class="logo-sub">Recibo de Venta</div>
         </div>
         <div class="doc-title">
@@ -228,7 +230,7 @@ export function generatePaymentSlipHTML({ sale, client, project, installments })
     </div>
 
     <div class="footer">
-        <p>PredioClick - Sistema de Gestión de Predios</p>
+        <p>${brand.appName} - ${brand.subtitle}</p>
         <p>Documento generado el ${fmtDate(new Date().toISOString())}</p>
     </div>
 </div>
@@ -257,7 +259,7 @@ export function generatePaymentReceiptHTML({ payment, sale, client, project }) {
 <div class="doc-container">
     <div class="header">
         <div>
-            <div class="logo">🏡 PredioClick</div>
+            <div class="logo">${brand.emoji} ${brand.appName}</div>
             <div class="logo-sub">Recibo de Pago</div>
         </div>
         <div class="doc-title">
@@ -317,7 +319,7 @@ export function generatePaymentReceiptHTML({ payment, sale, client, project }) {
     </div>
 
     <div class="footer">
-        <p>PredioClick - Sistema de Gestión de Predios</p>
+        <p>${brand.appName} - ${brand.subtitle}</p>
         <p>Documento generado el ${fmtDate(new Date().toISOString())}</p>
     </div>
 </div>

@@ -1,7 +1,8 @@
 /**
- * PredioClick - Auth Service (PHP API)
+ * White-Label - Auth Service (PHP API)
  */
 import { api, setToken } from '../lib/apiClient';
+import { brand } from '../config/brandConfig';
 
 export const authService = {
     /**
@@ -34,7 +35,7 @@ export const authService = {
      * Get current session (check if token is valid)
      */
     async getSession() {
-        const token = localStorage.getItem('loteclick_token');
+        const token = localStorage.getItem(brand.tokenKey);
         if (!token) return { data: null, error: null };
 
         const result = await api.get('endpoints/auth.php?action=me');
@@ -79,7 +80,7 @@ export const authService = {
      */
     onAuthStateChange(callback) {
         // Check initial state
-        const token = localStorage.getItem('loteclick_token');
+        const token = localStorage.getItem(brand.tokenKey);
         if (token) {
             // Verify token is valid
             this.getSession().then(result => {

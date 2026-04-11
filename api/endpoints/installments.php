@@ -1,6 +1,6 @@
 <?php
 /**
- * PredioClick API - Installments Endpoints
+ * LoteClick API - Installments Endpoints
  */
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../jwt.php';
@@ -97,6 +97,7 @@ function generateInstallments() {
     $numInstallments = intval($body['numInstallments'] ?? 0);
     $startDate = $body['startDate'] ?? date('Y-m-d');
     $downPayment = floatval($body['downPayment'] ?? 0);
+    $separeAmount = floatval($body['separeAmount'] ?? 0);
 
     if (!$saleId || $numInstallments <= 0) {
         jsonError('saleId y numInstallments son requeridos');
@@ -110,6 +111,11 @@ function generateInstallments() {
     $installmentAmount = round($totalAmount / $numInstallments, 2);
     $installments = [];
 
+    // Calculate the due date for the first regular installment
+    $firstRegularDueDate = date('Y-m-d', strtotime("$startDate +1 months"));
+    // The remaining initial payment is due one day before the first regular installment
+    $remainingInitialDueDate = date('Y-m-d', strtotime("$firstRegularDueDate -1 day"));
+
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare(
@@ -117,8 +123,37 @@ function generateInstallments() {
              VALUES (?, ?, ?, ?, ?, ?, ?)"
         );
 
-        // Installment #0: Down payment (cuota inicial / enganche)
-        if ($downPayment > 0) {
+        // Installment #-1: Separe (reservation fee) — only if separeAmount > 0
+        if ($separeAmount > 0 && $downPayment > 0) {
+            $separeId = generateUUID();
+            $stmt->execute([$separeId, $saleId, -1, $separeAmount, $startDate, 'pending', 0]);
+            $installments[] = [
+                'id' => $separeId,
+                'sale_id' => $saleId,
+                'installment_number' => -1,
+                'amount' => $separeAmount,
+                'due_date' => $startDate,
+                'status' => 'pending',
+                'paid_amount' => 0
+            ];
+
+            // Installment #0: Remaining initial payment (downPayment - separe)
+            $remainingInitial = $downPayment - $separeAmount;
+            if ($remainingInitial > 0) {
+                $downId = generateUUID();
+                $stmt->execute([$downId, $saleId, 0, $remainingInitial, $remainingInitialDueDate, 'pending', 0]);
+                $installments[] = [
+                    'id' => $downId,
+                    'sale_id' => $saleId,
+                    'installment_number' => 0,
+                    'amount' => $remainingInitial,
+                    'due_date' => $remainingInitialDueDate,
+                    'status' => 'pending',
+                    'paid_amount' => 0
+                ];
+            }
+        } elseif ($downPayment > 0) {
+            // No separe — full down payment as installment #0 (original behavior)
             $downId = generateUUID();
             $stmt->execute([$downId, $saleId, 0, $downPayment, $startDate, 'pending', 0]);
             $installments[] = [
@@ -132,7 +167,7 @@ function generateInstallments() {
             ];
         }
 
-        // Regular installments #1 to #N
+        // Regular installments #1 to #N (FIXED — never affected by separe/initial logic)
         for ($i = 1; $i <= $numInstallments; $i++) {
             $dueDate = date('Y-m-d', strtotime("$startDate +$i months"));
 
@@ -559,49 +594,65 @@ function autoRedistributeInstallments() {
 
     $pdo->beginTransaction();
     try {
-        // 1. Mark the first pending installment as paid
+        // Find the target installment using the provided payment ID, or fallback to the first
+        // Wait, the client doesn't send the target installment ID to autoRedistributeInstallments in the current payload!
+        // We need to use the first pending installment, but calculate its actual remaining debt.
         $firstInstallment = $pendingInstallments[0];
-        $expectedAmount = floatval($firstInstallment['amount']);
+        $instNumber = intval($firstInstallment['installment_number']);
+        $originalAmount = floatval($firstInstallment['amount']);
+        $alreadyPaid = floatval($firstInstallment['paid_amount']);
+        $expectedAmount = $originalAmount - $alreadyPaid;
 
-        $pdo->prepare(
-            "UPDATE installments SET status = 'paid', paid_amount = ?, paid_date = CURDATE(), payment_id = ? WHERE id = ?"
-        )->execute([$paymentAmount, $paymentId, $firstInstallment['id']]);
-
-        // If installment #0 (down payment) was paid, transition lot status to 'sold'
-        if (intval($firstInstallment['installment_number']) === 0) {
-            $stmt = $pdo->prepare("SELECT lot_id FROM sales WHERE id = ?");
-            $stmt->execute([$saleId]);
-            $sale = $stmt->fetch();
-            if ($sale) {
-                $pdo->prepare("UPDATE lots SET status = 'sold' WHERE id = ? AND status = 'pending_initial'")->execute([$sale['lot_id']]);
-            }
-        }
-
-        // 2. Calculate the difference
         $difference = $expectedAmount - $paymentAmount; // positive = underpaid, negative = overpaid
-        $remainingInstallments = array_slice($pendingInstallments, 1);
-        $numRemaining = count($remainingInstallments);
+        $isInitial = ($instNumber <= 0);
 
-        if ($numRemaining > 0 && abs($difference) > 0.01) {
-            if ($difference > 0) {
-                // =============================================
-                // UNDERPAYMENT: add difference to NEXT installment only
-                // =============================================
-                $nextInst = $remainingInstallments[0];
-                $newAmount = round(floatval($nextInst['amount']) + $difference, 2);
-                $pdo->prepare(
-                    "UPDATE installments SET amount = ? WHERE id = ?"
-                )->execute([$newAmount, $nextInst['id']]);
+        if ($difference > 0.01 && $isInitial) {
+            // =============================================
+            // UNDERPAYMENT ON INITIAL QUOTA (Separe / Down Payment)
+            // Do NOT mark as paid and do NOT redistribute to regular quotas.
+            // Just mark it as partial and keep the deficit here.
+            // =============================================
+            $newPaidAmount = $alreadyPaid + $paymentAmount;
+            $pdo->prepare(
+                "UPDATE installments SET status = 'partial', paid_amount = ?, paid_date = CURDATE(), payment_id = ? WHERE id = ?"
+            )->execute([$newPaidAmount, $paymentId, $firstInstallment['id']]);
 
-            } else {
-                // =============================================
-                // OVERPAYMENT: subtract excess from LAST installment toward first
-                // =============================================
-                $excess = abs($difference); // positive amount to subtract
+        } else {
+            // =============================================
+            // FULL PAYMENT, OVERPAYMENT, OR UNDERPAYMENT ON REGULAR QUOTA
+            // Mark as paid and redistribute the difference (if any).
+            // =============================================
+            $pdo->prepare(
+                "UPDATE installments SET status = 'paid', paid_amount = ?, paid_date = CURDATE(), payment_id = ? WHERE id = ?"
+            )->execute([$originalAmount, $paymentId, $firstInstallment['id']]); // paid_amount becomes full amount
 
-                // Process from last to first
-                for ($i = $numRemaining - 1; $i >= 0 && $excess > 0.01; $i--) {
-                    $inst = $remainingInstallments[$i];
+            // Transition lot status if it's the down payment
+            if ($instNumber === 0) {
+                $stmt = $pdo->prepare("SELECT lot_id FROM sales WHERE id = ?");
+                $stmt->execute([$saleId]);
+                $sale = $stmt->fetch();
+                if ($sale) {
+                    $pdo->prepare("UPDATE lots SET status = 'sold' WHERE id = ? AND status = 'pending_initial'")->execute([$sale['lot_id']]);
+                }
+            }
+
+            if (abs($difference) > 0.01) {
+                $remainingInstallments = array_slice($pendingInstallments, 1);
+                $numRemaining = count($remainingInstallments);
+
+                if ($numRemaining > 0) {
+                    if ($difference > 0) {
+                        // UNDERPAYMENT (Regular quota): add difference to NEXT installment
+                        $nextInst = $remainingInstallments[0];
+                        $newAmount = round(floatval($nextInst['amount']) + $difference, 2);
+                        $pdo->prepare(
+                            "UPDATE installments SET amount = ? WHERE id = ?"
+                        )->execute([$newAmount, $nextInst['id']]);
+                    } else {
+                        // OVERPAYMENT: subtract excess from LAST installment toward first
+                        $excess = abs($difference);
+                        for ($i = $numRemaining - 1; $i >= 0 && $excess > 0.01; $i--) {
+                            $inst = $remainingInstallments[$i];
                     $instAmount = floatval($inst['amount']);
 
                     if ($excess >= $instAmount) {
@@ -616,9 +667,11 @@ function autoRedistributeInstallments() {
                         )->execute([$newAmount, $inst['id']]);
                         $excess = 0;
                     }
-                }
-            }
-        }
+                    }
+                    } // closes else
+                } // closes if numRemaining
+            } // closes if abs(diff)
+        } // closes else (regular quote)
 
         $pdo->commit();
 

@@ -1,0 +1,40 @@
+﻿[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32mÔ£ô[39m 1316 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                          [39m[1m[2m    1.22 kB[22m[1m[22m[2m Ôöé gzip:   0.59 kB[22m
+[2mdist/[22m[35massets/index-Dcy5MDAX.css           [39m[1m[2m   35.93 kB[22m[1m[22m[2m Ôöé gzip:   6.79 kB[22m
+[2mdist/[22m[36massets/purify.es-C_uT9hQ1.js        [39m[1m[2m   21.98 kB[22m[1m[22m[2m Ôöé gzip:   8.74 kB[22m
+[2mdist/[22m[36massets/index.es-CRwI3yFY.js         [39m[1m[2m  150.47 kB[22m[1m[22m[2m Ôöé gzip:  51.44 kB[22m
+[2mdist/[22m[36massets/html2canvas.esm-CBrSDip1.js  [39m[1m[2m  201.42 kB[22m[1m[22m[2m Ôöé gzip:  48.03 kB[22m
+[2mdist/[22m[36massets/index-C4fMTI8B.js            [39m[1m[33m1,357.46 kB[39m[22m[2m Ôöé gzip: 386.57 kB[22m
+npx : [33m
+En línea: 1 Carácter: 1
++ npx vite build 2>&1 | 
+Out-File -FilePath 
+build_output.txt -Encoding 
+u ...
++ ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: ([3  
+  3m:String) [], RemoteE   
+ xception
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+(!) Some chunks are larger 
+than 500 kB after 
+minification. Consider:
+- Using dynamic import() 
+to code-split the 
+application
+- Use build.rollupOptions.o
+utput.manualChunks to 
+improve chunking: https://r
+ollupjs.org/configuration-o
+ptions/#output-manualchunks
+- Adjust chunk size limit 
+for this warning via build.
+chunkSizeWarningLimit.[39m
+[32mÔ£ô built in 14.60s[39m

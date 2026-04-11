@@ -312,10 +312,13 @@ function Reports() {
                 <div className="stat-icon" style={{ background: color || 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600))' }}>
                     <Icon />
                 </div>
-                <div className="stat-content">
-                    <h3 style={{ fontSize: 'clamp(0.9rem, 2vw, 1.2rem)', wordBreak: 'break-word' }}>{value}</h3>
-                    <p>{label}</p>
-                    {subtext && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{subtext}</span>}
+                <div className="stat-content" style={{ overflow: 'hidden' }}>
+                    <h3 style={{ 
+                        fontSize: 'clamp(1.2rem, 2vw, 1.6rem)', 
+                        letterSpacing: '-0.5px'
+                    }}>{value}</h3>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{label}</p>
+                    {subtext && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>{subtext}</span>}
                 </div>
             </div>
         </div>
@@ -383,7 +386,7 @@ function Reports() {
             {/* ===== KPI CARDS (responsive grid) ===== */}
             <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
                 gap: 'var(--spacing-4)',
                 marginBottom: 'var(--spacing-6)'
             }}>

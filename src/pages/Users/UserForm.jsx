@@ -12,7 +12,7 @@ import {
     FiEye,
     FiEyeOff
 } from 'react-icons/fi';
-import { useAuth, ROLES, ROLE_LABELS } from '../../context/AuthContext';
+import { useAuth, ROLES, ROLE_LABELS, ROLE_ICONS, getRolesArray } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 
 function UserForm() {
@@ -27,7 +27,7 @@ function UserForm() {
         email: '',
         password: '',
         confirmPassword: '',
-        role: ROLES.SELLER,
+        roles: [ROLES.SELLER],
         isActive: true,
         associatedProjects: []
     });
@@ -54,7 +54,7 @@ function UserForm() {
                     email: user.email || '',
                     password: '',
                     confirmPassword: '',
-                    role: user.role || ROLES.SELLER,
+                    roles: getRolesArray(user),
                     isActive: user.isActive !== false,
                     associatedProjects: user.associatedProjects || []
                 });
@@ -73,6 +73,35 @@ function UserForm() {
 
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: null }));
+        }
+        setApiError('');
+    };
+
+    const handleRoleToggle = (role) => {
+        setFormData(prev => {
+            let newRoles;
+
+            // Admin and Partner are exclusive — selecting one clears others
+            if (role === ROLES.ADMIN || role === ROLES.PARTNER) {
+                newRoles = prev.roles.includes(role) ? [ROLES.SELLER] : [role];
+            } else {
+                // For seller/treasurer, toggle individually
+                if (prev.roles.includes(role)) {
+                    // Don't allow removing the last role
+                    newRoles = prev.roles.filter(r => r !== role);
+                    if (newRoles.length === 0) newRoles = [ROLES.SELLER];
+                } else {
+                    // Remove admin/partner if present, add the new role
+                    newRoles = prev.roles.filter(r => r !== ROLES.ADMIN && r !== ROLES.PARTNER);
+                    newRoles.push(role);
+                }
+            }
+
+            return { ...prev, roles: newRoles };
+        });
+
+        if (errors.roles) {
+            setErrors(prev => ({ ...prev, roles: null }));
         }
         setApiError('');
     };
@@ -118,8 +147,8 @@ function UserForm() {
             }
         }
 
-        if (!formData.role) {
-            newErrors.role = 'Selecciona un rol';
+        if (!formData.roles || formData.roles.length === 0) {
+            newErrors.roles = 'Selecciona al menos un rol';
         }
 
         setErrors(newErrors);
@@ -135,12 +164,17 @@ function UserForm() {
         setApiError('');
 
         try {
+            // Send role as JSON array string for multi-role support
+            const roleValue = formData.roles.length === 1
+                ? formData.roles[0]
+                : JSON.stringify(formData.roles);
+
             const userData = {
                 name: formData.name,
                 email: formData.email,
-                role: formData.role,
+                role: roleValue,
                 isActive: formData.isActive,
-                associatedProjects: formData.role === ROLES.PARTNER ? formData.associatedProjects : []
+                associatedProjects: formData.roles.includes(ROLES.PARTNER) ? formData.associatedProjects : []
             };
 
             // Only include password if provided
@@ -172,6 +206,14 @@ function UserForm() {
             setSubmitting(false);
         }
     };
+
+    // Available roles for the checkbox grid
+    const availableRoles = [
+        { key: ROLES.ADMIN, label: ROLE_LABELS.admin, icon: ROLE_ICONS.admin, desc: 'Acceso total a todas las funcionalidades del sistema.' },
+        { key: ROLES.SELLER, label: ROLE_LABELS.seller, icon: ROLE_ICONS.seller, desc: 'Gestiona clientes, ventas y pagos.' },
+        { key: ROLES.TREASURER, label: ROLE_LABELS.treasurer, icon: ROLE_ICONS.treasurer, desc: 'Gestiona pagos, gastos y entregas a socios.' },
+        { key: ROLES.PARTNER, label: ROLE_LABELS.partner, icon: ROLE_ICONS.partner, desc: 'Solo ve los proyectos asociados.' },
+    ];
 
     return (
         <div className="page-container">
@@ -291,41 +333,64 @@ function UserForm() {
                 {/* Role and Permissions */}
                 <div className="card" style={{ marginTop: '1.5rem' }}>
                     <div className="card-header">
-                        <h3><FiShield /> Rol y Permisos</h3>
+                        <h3><FiShield /> Roles y Permisos</h3>
                     </div>
                     <div className="card-body">
-                        <div className="form-row">
-                            <div className="form-group" style={{ flex: 1 }}>
-                                <label className="form-label">
-                                    <FiShield style={{ marginRight: '0.5rem' }} />
-                                    Rol del Usuario *
-                                </label>
-                                <select
-                                    name="role"
-                                    className={`form-control ${errors.role ? 'error' : ''}`}
-                                    value={formData.role}
-                                    onChange={handleChange}
-                                >
-                                    {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                                        <option key={key} value={key}>{label}</option>
-                                    ))}
-                                </select>
-                                {errors.role && <span className="form-error">{errors.role}</span>}
+                        <div className="form-group">
+                            <label className="form-label">
+                                <FiShield style={{ marginRight: '0.5rem' }} />
+                                Roles del Usuario * <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.85rem' }}>(puedes seleccionar más de uno)</span>
+                            </label>
+                            {errors.roles && <span className="form-error" style={{ marginBottom: '0.5rem', display: 'block' }}>{errors.roles}</span>}
 
-                                {/* Role Description */}
-                                <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem' }}>
-                                    {formData.role === ROLES.ADMIN && (
-                                        <span>🔐 <strong>Administrador:</strong> Acceso total a todas las funcionalidades del sistema.</span>
-                                    )}
-                                    {formData.role === ROLES.SELLER && (
-                                        <span>💼 <strong>Vendedor:</strong> Puede gestionar clientes, ventas y pagos. Acceso limitado a gastos y usuarios.</span>
-                                    )}
-                                    {formData.role === ROLES.PARTNER && (
-                                        <span>🤝 <strong>Socio:</strong> Solo puede ver los proyectos asociados, sus ventas y gastos relacionados.</span>
-                                    )}
-                                </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                {availableRoles.map(({ key, label, icon, desc }) => {
+                                    const isSelected = formData.roles.includes(key);
+                                    return (
+                                        <div
+                                            key={key}
+                                            onClick={() => handleRoleToggle(key)}
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '0.25rem',
+                                                padding: '1rem',
+                                                background: isSelected
+                                                    ? 'rgba(76, 175, 80, 0.1)'
+                                                    : 'var(--bg-secondary)',
+                                                borderRadius: 'var(--radius-lg)',
+                                                cursor: 'pointer',
+                                                border: isSelected
+                                                    ? '2px solid var(--color-primary-500)'
+                                                    : '2px solid var(--border-color)',
+                                                transition: 'all 0.2s',
+                                                userSelect: 'none'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => {}}
+                                                    style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary-500)' }}
+                                                />
+                                                <span style={{ fontSize: '1.1rem' }}>{icon}</span>
+                                                <span style={{ fontWeight: 600 }}>{label}</span>
+                                            </div>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', paddingLeft: '2rem' }}>{desc}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
 
+                            {/* Active roles summary */}
+                            <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem' }}>
+                                <strong>Roles activos:</strong>{' '}
+                                {formData.roles.map(r => `${ROLE_ICONS[r]} ${ROLE_LABELS[r]}`).join(' + ')}
+                            </div>
+                        </div>
+
+                        <div className="form-row" style={{ marginTop: '1rem' }}>
                             <div className="form-group" style={{ flex: 1 }}>
                                 <label className="form-label">Estado</label>
                                 <div style={{ marginTop: '0.5rem' }}>
@@ -347,7 +412,7 @@ function UserForm() {
                         </div>
 
                         {/* Partner Projects */}
-                        {formData.role === ROLES.PARTNER && (
+                        {formData.roles.includes(ROLES.PARTNER) && (
                             <div className="form-group" style={{ marginTop: '1.5rem' }}>
                                 <label className="form-label">
                                     <FiFolder style={{ marginRight: '0.5rem' }} />

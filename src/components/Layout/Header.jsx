@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FiMenu, FiSearch, FiBell, FiChevronRight, FiLogOut, FiUser, FiChevronDown } from 'react-icons/fi';
 import { useAuth, ROLE_LABELS } from '../../context/AuthContext';
+import { brand } from '../../config/brandConfig';
 
 const ROLE_COLORS = {
     admin: '#3b82f6',
@@ -67,7 +68,7 @@ function Header({ onMenuClick }) {
         }
         if (path.startsWith('/reports')) return 'Reportes';
 
-        return 'PredioClick';
+        return brand.appName;
     };
 
     const getBreadcrumbs = () => {

@@ -10,7 +10,8 @@ import {
     FiFolder,
     FiTrash2,
     FiEye,
-    FiImage
+    FiImage,
+    FiDownload
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { disbursementService } from '../../services/disbursementService';
@@ -25,6 +26,9 @@ function DisbursementList() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterProject, setFilterProject] = useState('');
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [selectedImageTitle, setSelectedImageTitle] = useState('');
 
     useEffect(() => {
         loadDisbursements();
@@ -51,6 +55,12 @@ function DisbursementList() {
             setDisbursements(prev => prev.filter(d => d.id !== confirmDeleteId));
         }
         setConfirmDeleteId(null);
+    };
+
+    const openImageModal = (imageUrl, title) => {
+        setSelectedImage(imageUrl);
+        setSelectedImageTitle(title || 'Comprobante');
+        setShowImageModal(true);
     };
 
 
@@ -177,10 +187,15 @@ function DisbursementList() {
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                {(d.receipt_image || d.signature_image) && (
-                                                    <a href={d.receipt_image || d.signature_image} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline">
-                                                        <FiEye />
-                                                    </a>
+                                                {d.receipt_image && (
+                                                    <button onClick={() => openImageModal(d.receipt_image, `Recibo - ${d.partner?.name}`)} className="btn btn-sm btn-outline">
+                                                        <FiEye /> Recibo
+                                                    </button>
+                                                )}
+                                                {d.signature_image && (
+                                                    <button onClick={() => openImageModal(d.signature_image, `Firma - ${d.partner?.name}`)} className="btn btn-sm btn-outline">
+                                                        <FiEye /> Firma
+                                                    </button>
                                                 )}
                                                 <button onClick={() => handleDelete(d.id)} className="btn btn-sm btn-danger">
                                                     <FiTrash2 />
@@ -230,13 +245,18 @@ function DisbursementList() {
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'var(--spacing-3)' }}>
-                                    {(d.receipt_image || d.signature_image) && (
-                                        <a href={d.receipt_image || d.signature_image} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline" style={{ flex: 1 }}>
-                                            <FiEye /> Ver
-                                        </a>
+                                    {d.receipt_image && (
+                                        <button onClick={() => openImageModal(d.receipt_image, `Recibo - ${d.partner?.name}`)} className="btn btn-sm btn-outline" style={{ flex: 1 }}>
+                                            <FiEye /> Recibo
+                                        </button>
+                                    )}
+                                    {d.signature_image && (
+                                        <button onClick={() => openImageModal(d.signature_image, `Firma - ${d.partner?.name}`)} className="btn btn-sm btn-outline" style={{ flex: 1 }}>
+                                            <FiEye /> Firma
+                                        </button>
                                     )}
                                     <button onClick={() => handleDelete(d.id)} className="btn btn-sm btn-danger" style={{ flex: 1 }}>
-                                        <FiTrash2 /> Eliminar
+                                        <FiTrash2 />
                                     </button>
                                 </div>
                             </div>
@@ -244,6 +264,59 @@ function DisbursementList() {
                     </div>
                 </>
             )}
+            {/* Image Modal */}
+            {showImageModal && selectedImage && (
+                <div className="modal-overlay" onClick={() => setShowImageModal(false)}>
+                    <div
+                        className="modal modal-lg"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+                    >
+                        <div className="modal-header">
+                            <h3 className="modal-title">
+                                <FiImage style={{ marginRight: '8px' }} />
+                                {selectedImageTitle}
+                            </h3>
+                            <button className="modal-close" onClick={() => setShowImageModal(false)}>×</button>
+                        </div>
+                        <div className="modal-body" style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            background: 'var(--bg-tertiary)',
+                            padding: 'var(--spacing-4)',
+                            maxHeight: '70vh',
+                            overflow: 'auto'
+                        }}>
+                            <img
+                                src={selectedImage}
+                                alt={selectedImageTitle}
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '100%',
+                                    objectFit: 'contain',
+                                    borderRadius: 'var(--radius-lg)',
+                                    boxShadow: 'var(--shadow-lg)'
+                                }}
+                            />
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowImageModal(false)}>
+                                Cerrar
+                            </button>
+                            <a
+                                href={selectedImage}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-primary"
+                            >
+                                <FiDownload /> Abrir en nueva pestaña
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <ConfirmModal
                 isOpen={!!confirmDeleteId}
                 title="¿Eliminar esta entrega?"

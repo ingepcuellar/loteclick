@@ -1,5 +1,5 @@
 /**
- * PredioClick - Utility Registration Service (PHP API)
+ * LoteClick - Utility Registration Service (PHP API)
  * Matrículas de Servicios Públicos
  */
 import { api } from '../lib/apiClient';

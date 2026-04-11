@@ -7,7 +7,8 @@ import {
     FiCalendar,
     FiFilter,
     FiEye,
-    FiImage
+    FiImage,
+    FiCreditCard
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency, formatDate } from '../../lib/formatters';
@@ -172,6 +173,7 @@ function PaymentList() {
                                     <th>Cliente</th>
                                     <th>Proyecto / Lote</th>
                                     <th>Monto</th>
+                                    <th>Método</th>
                                     <th>Recibo</th>
                                     <th>Acciones</th>
                                 </tr>
@@ -219,6 +221,17 @@ function PaymentList() {
                                             </td>
                                             <td style={{ fontWeight: '600', color: 'var(--color-success)' }}>
                                                 {formatCurrency(payment.amount)}
+                                            </td>
+                                            <td>
+                                                {(payment.paymentMethod || payment.payment_method) === 'transfer' ? (
+                                                    <span className="badge badge-info" style={{ fontSize: 'var(--font-size-xs)' }}>
+                                                        🏦 Transferencia
+                                                    </span>
+                                                ) : (
+                                                    <span className="badge" style={{ fontSize: 'var(--font-size-xs)', background: 'rgba(34, 197, 94, 0.1)', color: '#16a34a', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                                                        💵 Efectivo
+                                                    </span>
+                                                )}
                                             </td>
                                             <td>
                                                 {payment.receiptImage ? (
@@ -275,6 +288,12 @@ function PaymentList() {
                                         <div className="mobile-card-row">
                                             <span className="mobile-card-label">Recibo</span>
                                             <span className="mobile-card-value">{payment.receiptImage ? '✓ Con recibo' : 'Sin recibo'}</span>
+                                        </div>
+                                        <div className="mobile-card-row">
+                                            <span className="mobile-card-label">Método</span>
+                                            <span className="mobile-card-value">
+                                                {(payment.paymentMethod || payment.payment_method) === 'transfer' ? '🏦 Transferencia' : '💵 Efectivo'}
+                                            </span>
                                         </div>
                                     </div>
                                 </Link>

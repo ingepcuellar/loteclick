@@ -1,9 +1,10 @@
 /**
- * PredioClick - PDF Exporter Utility
+ * White-Label - PDF Exporter Utility
  * Genera reportes PDF profesionales usando jsPDF + autoTable
  */
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { brand } from '../config/brandConfig';
 
 const COLORS = {
     primary: [99, 102, 241],      // Indigo
@@ -57,7 +58,7 @@ export function exportReportToPDF({
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
     doc.setTextColor(...COLORS.white);
-    doc.text('PredioClick', 14, 13);
+    doc.text(brand.appName, 14, 13);
 
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
@@ -160,7 +161,7 @@ export function exportReportToPDF({
 
             const pageNum = doc.internal.getNumberOfPages();
             doc.text(
-                `PredioClick — ${title} | Página ${data.pageNumber} de ${pageNum}`,
+                `${brand.appName} — ${title} | Página ${data.pageNumber} de ${pageNum}`,
                 pageWidth / 2, pageHeight - 8,
                 { align: 'center' }
             );

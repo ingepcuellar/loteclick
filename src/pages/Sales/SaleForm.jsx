@@ -18,6 +18,7 @@ import { useApp } from '../../context/AppContext';
 import { formatCurrency } from '../../lib/formatters';
 import { commissionAgentService } from '../../services/commissionAgentService';
 import { generatePaymentSlipHTML, openPrintWindow, writeToPrintWindow } from '../../lib/barcodeUtils';
+import { brand } from '../../config/brandConfig';
 
 function SaleForm() {
     const navigate = useNavigate();
@@ -30,6 +31,7 @@ function SaleForm() {
         paymentType: 'installments',
         numberOfInstallments: 12,
         downPayment: '',
+        separeAmount: '',
         saleDate: new Date().toISOString().split('T')[0],
         notes: '',
         commissionAgent: '',
@@ -260,6 +262,7 @@ function SaleForm() {
                 paymentType: formData.paymentType,
                 numberOfInstallments: formData.paymentType === 'installments' ? parseInt(formData.numberOfInstallments) : 1,
                 downPayment: parseFloat(formData.downPayment) || 0,
+                separeAmount: parseFloat(formData.separeAmount) || 0,
                 saleDate: formData.saleDate,
                 notes: formData.notes,
                 commissionAgent: formData.commissionAgent || null,
@@ -304,6 +307,7 @@ function SaleForm() {
                     paymentType: formData.paymentType,
                     numberOfInstallments: formData.paymentType === 'installments' ? parseInt(formData.numberOfInstallments) : 1,
                     downPayment: parseFloat(formData.downPayment) || 0,
+                    separeAmount: parseFloat(formData.separeAmount) || 0,
                     saleDate: formData.saleDate,
                     notes: formData.notes,
                     commissionAgent: formData.commissionAgent || null,
@@ -381,7 +385,7 @@ function SaleForm() {
                 const fullPhone = phone.startsWith('57') ? phone : `57${phone}`;
                 const lotNumbers = selectedLots.map(l => `#${l.lotNumber}`).join(', ');
                 const message = encodeURIComponent(
-                    `🏡 *PredioClick - Solicitud de Descuento*\n\n` +
+                    `${brand.emoji} *${brand.appName} - Solicitud de Descuento*\n\n` +
                     `Hola ${partner.name}, se ha registrado un descuento de ${formatCurrency(totalDiscountAmount)} ` +
                     `en la venta del Lote ${lotNumbers} al cliente ${clientName}.\n\n` +
                     `La venta se realizó normalmente. Por favor ingrese al sistema para revisar y aprobar el descuento.\n\n` +
@@ -701,29 +705,98 @@ function SaleForm() {
                             </div>
 
                             {formData.paymentType === 'installments' && (
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label className="form-label">Cuota Inicial</label>
+                                <>
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label className="form-label">Cuota Inicial</label>
+                                            <input
+                                                type="number"
+                                                className="form-input"
+                                                placeholder="3000000"
+                                                value={formData.downPayment}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, downPayment: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Número de Cuotas</label>
+                                            <input
+                                                type="number"
+                                                className="form-input"
+                                                min="1"
+                                                max="120"
+                                                value={formData.numberOfInstallments}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, numberOfInstallments: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Separe Section */}
+                                    <div className="form-group" style={{
+                                        background: 'rgba(16, 185, 129, 0.08)',
+                                        border: '1px solid rgba(16, 185, 129, 0.25)',
+                                        borderRadius: 'var(--radius-lg)',
+                                        padding: 'var(--spacing-4)',
+                                        marginTop: 'var(--spacing-2)'
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 'var(--spacing-2)',
+                                            marginBottom: 'var(--spacing-3)',
+                                            color: '#10b981',
+                                            fontWeight: '600'
+                                        }}>
+                                            <FiDollarSign />
+                                            Separe (Reserva)
+                                        </div>
+                                        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: 'var(--spacing-3)' }}>
+                                            Si el cliente paga un separe al momento del negocio, ingresa el monto aquí.
+                                            El saldo de la cuota inicial se calculará automáticamente.
+                                        </p>
                                         <input
                                             type="number"
                                             className="form-input"
-                                            placeholder="10000000"
-                                            value={formData.downPayment}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, downPayment: e.target.value }))}
+                                            placeholder="500000"
+                                            value={formData.separeAmount}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, separeAmount: e.target.value }))}
                                         />
+                                        {parseFloat(formData.separeAmount) > 0 && parseFloat(formData.downPayment) > 0 && (
+                                            <div style={{
+                                                marginTop: 'var(--spacing-3)',
+                                                padding: 'var(--spacing-3)',
+                                                background: 'var(--bg-secondary)',
+                                                borderRadius: 'var(--radius-md)',
+                                                fontSize: 'var(--font-size-sm)'
+                                            }}>
+                                                <div className="flex-between mb-2">
+                                                    <span style={{ color: 'var(--text-muted)' }}>Separe (día del negocio):</span>
+                                                    <span style={{ fontWeight: '600', color: '#10b981' }}>
+                                                        {formatCurrency(formData.separeAmount)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex-between">
+                                                    <span style={{ color: 'var(--text-muted)' }}>Saldo de Inicial:</span>
+                                                    <span style={{ fontWeight: '600', color: 'var(--color-warning)' }}>
+                                                        {formatCurrency(Math.max(0, parseFloat(formData.downPayment) - parseFloat(formData.separeAmount)))}
+                                                    </span>
+                                                </div>
+                                                {parseFloat(formData.separeAmount) > parseFloat(formData.downPayment) && (
+                                                    <div style={{
+                                                        marginTop: 'var(--spacing-2)',
+                                                        color: 'var(--color-error)',
+                                                        fontSize: 'var(--font-size-xs)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}>
+                                                        <FiAlertTriangle size={12} />
+                                                        El separe no puede ser mayor a la cuota inicial
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Número de Cuotas</label>
-                                        <input
-                                            type="number"
-                                            className="form-input"
-                                            min="1"
-                                            max="120"
-                                            value={formData.numberOfInstallments}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, numberOfInstallments: e.target.value }))}
-                                        />
-                                    </div>
-                                </div>
+                                </>
                             )}
 
                             {formData.paymentType === 'installments' && selectedLots.length > 0 && (

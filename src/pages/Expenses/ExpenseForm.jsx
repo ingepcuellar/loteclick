@@ -10,17 +10,20 @@ import {
     FiCalendar,
     FiUser,
     FiArrowLeft,
-    FiUpload
+    FiUpload,
+    FiGrid,
+    FiAlertCircle
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { storageService } from '../../services/storageService';
 import { pickImage } from '../../lib/cameraUtils';
+import { formatCurrency } from '../../lib/formatters';
 
 const EXPENSE_CATEGORIES = [
     {
         group: 'Operativos', items: [
             { value: 'commissions', label: 'Comisiones', description: 'Pagos a comisionistas' },
-            { value: 'signatures', label: 'Firmas', description: 'Escrituras, firmas notariales' },
+            { value: 'signatures', label: 'Firmas y Escrituras', description: 'Escrituras, firmas notariales' },
             { value: 'construction', label: 'Obras', description: 'Construcción, materiales, mano de obra' },
         ]
     },
@@ -47,10 +50,13 @@ const EXPENSE_CATEGORIES = [
 // Flat list for lookups
 const EXPENSE_CATEGORIES_FLAT = EXPENSE_CATEGORIES.flatMap(g => g.items);
 
+// Fixed authentication cost when a sale falls through
+const AUTHENTICATION_COST = 10000;
+
 function ExpenseForm() {
     const navigate = useNavigate();
     const { id } = useParams();
-    const { state, addExpense, updateExpense, getExpenseById, getProjectById } = useApp();
+    const { state, addExpense, updateExpense, getExpenseById, getProjectById, getSalesByProject } = useApp();
     const isEditing = Boolean(id);
 
     const [formData, setFormData] = useState({
@@ -60,13 +66,17 @@ function ExpenseForm() {
         partnerId: '',
         category: 'other',
         date: new Date().toISOString().split('T')[0],
-        notes: ''
+        notes: '',
+        selectedLots: [],
     });
 
     const [errors, setErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
     const [attachmentFile, setAttachmentFile] = useState(null);
     const [attachmentPreview, setAttachmentPreview] = useState(null);
+
+    // Whether category is "signatures" (Firmas y Escrituras)
+    const isSignatures = formData.category === 'signatures';
 
     // Load existing expense if editing
     useEffect(() => {
@@ -80,8 +90,13 @@ function ExpenseForm() {
                     partnerId: expense.partnerId || '',
                     category: expense.category || 'other',
                     date: expense.date || new Date().toISOString().split('T')[0],
-                    notes: expense.notes || ''
+                    notes: expense.notes || '',
+                    selectedLots: expense.selectedLots || [],
                 });
+                // Show existing attachment preview
+                if (expense.attachment) {
+                    setAttachmentPreview(expense.attachment);
+                }
             } else {
                 navigate('/expenses');
             }
@@ -91,6 +106,20 @@ function ExpenseForm() {
     // Get partners from selected project
     const selectedProject = formData.projectId ? getProjectById(formData.projectId) : null;
     const projectPartners = selectedProject?.partners || [];
+
+    // Get sold lots for the selected project (for signatures multi-select)
+    const projectLots = selectedProject?.lots || [];
+    const soldLots = projectLots.filter(l => l.status === 'sold');
+
+    // Auto-fill description when category changes to "signatures"
+    useEffect(() => {
+        if (isSignatures && !isEditing) {
+            setFormData(prev => ({
+                ...prev,
+                description: 'Julio Ricardo',
+            }));
+        }
+    }, [isSignatures, isEditing]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -103,7 +132,16 @@ function ExpenseForm() {
         if (name === 'projectId') {
             setFormData(prev => ({
                 ...prev,
-                partnerId: ''
+                partnerId: '',
+                selectedLots: [],
+            }));
+        }
+
+        // When category changes away from signatures, clear selected lots and reset description
+        if (name === 'category' && value !== 'signatures') {
+            setFormData(prev => ({
+                ...prev,
+                selectedLots: [],
             }));
         }
 
@@ -115,6 +153,42 @@ function ExpenseForm() {
             }));
         }
     };
+
+    // Handle lot checkbox toggle for multi-select
+    const handleLotToggle = (lotId) => {
+        setFormData(prev => {
+            const isSelected = prev.selectedLots.some(sl => sl.lotId === lotId);
+            let newSelectedLots;
+            if (isSelected) {
+                newSelectedLots = prev.selectedLots.filter(sl => sl.lotId !== lotId);
+            } else {
+                newSelectedLots = [...prev.selectedLots, { lotId, isFallen: false }];
+            }
+            return { ...prev, selectedLots: newSelectedLots };
+        });
+    };
+
+    // Toggle "sale fell through" status for a lot
+    const handleLotFallenToggle = (lotId) => {
+        setFormData(prev => ({
+            ...prev,
+            selectedLots: prev.selectedLots.map(sl =>
+                sl.lotId === lotId ? { ...sl, isFallen: !sl.isFallen } : sl
+            )
+        }));
+    };
+
+    // Calculate total amount based on selected lots
+    const getCalculatedAmount = () => {
+        if (!isSignatures || formData.selectedLots.length === 0) return null;
+        // We don't auto-set a price since price per deed varies. 
+        // But for fallen sales, we can show the authentication-only cost.
+        const fallenCount = formData.selectedLots.filter(sl => sl.isFallen).length;
+        const normalCount = formData.selectedLots.length - fallenCount;
+        return { normalCount, fallenCount, authCost: fallenCount * AUTHENTICATION_COST };
+    };
+
+    const calculatedInfo = getCalculatedAmount();
 
     const validate = () => {
         const newErrors = {};
@@ -137,6 +211,10 @@ function ExpenseForm() {
 
         if (!formData.date) {
             newErrors.date = 'La fecha es requerida';
+        }
+
+        if (isSignatures && formData.selectedLots.length === 0) {
+            newErrors.selectedLots = 'Selecciona al menos un lote para registrar la escritura';
         }
 
         setErrors(newErrors);
@@ -162,7 +240,8 @@ function ExpenseForm() {
             const expenseData = {
                 ...formData,
                 amount: parseFloat(formData.amount),
-                attachment: attachmentUrl
+                attachment: attachmentUrl,
+                selectedLots: isSignatures ? formData.selectedLots : null,
             };
 
             if (isEditing) {
@@ -177,6 +256,16 @@ function ExpenseForm() {
         } finally {
             setSubmitting(false);
         }
+    };
+
+    // Find sale info for a lot (to determine buyer name)
+    const getSaleForLot = (lotId) => {
+        if (!formData.projectId) return null;
+        const sales = state.sales.filter(s =>
+            (s.projectId === formData.projectId || s.project_id === formData.projectId) &&
+            (s.lotId === lotId || s.lot_id === lotId)
+        );
+        return sales[0] || null;
     };
 
     return (
@@ -198,11 +287,58 @@ function ExpenseForm() {
                         <h3><FiFileText /> Información del Gasto</h3>
                     </div>
                     <div className="card-body">
+                        {/* Category FIRST — so it controls the description behavior */}
+                        <div className="form-row">
+                            <div className="form-group" style={{ flex: 1 }}>
+                                <label className="form-label">
+                                    <FiTag style={{ marginRight: '0.5rem' }} />
+                                    Categoría *
+                                </label>
+                                <select
+                                    name="category"
+                                    className={`form-control ${errors.category ? 'error' : ''}`}
+                                    value={formData.category}
+                                    onChange={handleChange}
+                                >
+                                    {EXPENSE_CATEGORIES.map(group => (
+                                        <optgroup key={group.group} label={group.group}>
+                                            {group.items.map(cat => (
+                                                <option key={cat.value} value={cat.value}>
+                                                    {cat.label} - {cat.description}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    ))}
+                                </select>
+                                {errors.category && <span className="form-error">{errors.category}</span>}
+                            </div>
+
+                            <div className="form-group" style={{ flex: 1 }}>
+                                <label className="form-label">
+                                    <FiCalendar style={{ marginRight: '0.5rem' }} />
+                                    Fecha *
+                                </label>
+                                <input
+                                    type="date"
+                                    name="date"
+                                    className={`form-control ${errors.date ? 'error' : ''}`}
+                                    value={formData.date}
+                                    onChange={handleChange}
+                                />
+                                {errors.date && <span className="form-error">{errors.date}</span>}
+                            </div>
+                        </div>
+
                         <div className="form-row">
                             <div className="form-group" style={{ flex: 2 }}>
                                 <label className="form-label">
                                     <FiFileText style={{ marginRight: '0.5rem' }} />
                                     Descripción *
+                                    {isSignatures && (
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
+                                            (Fijo para Firmas y Escrituras)
+                                        </span>
+                                    )}
                                 </label>
                                 <input
                                     type="text"
@@ -211,6 +347,8 @@ function ExpenseForm() {
                                     value={formData.description}
                                     onChange={handleChange}
                                     placeholder="Ej: Compra de materiales de construcción"
+                                    readOnly={isSignatures}
+                                    style={isSignatures ? { backgroundColor: 'var(--bg-secondary)', fontWeight: 600 } : {}}
                                 />
                                 {errors.description && <span className="form-error">{errors.description}</span>}
                             </div>
@@ -259,16 +397,17 @@ function ExpenseForm() {
                             <div className="form-group" style={{ flex: 1 }}>
                                 <label className="form-label">
                                     <FiUser style={{ marginRight: '0.5rem' }} />
-                                    Socio Responsable
+                                    Responsable del Gasto
                                 </label>
                                 <select
                                     name="partnerId"
                                     className="form-control"
                                     value={formData.partnerId}
                                     onChange={handleChange}
-                                    disabled={!formData.projectId || projectPartners.length === 0}
+                                    disabled={!formData.projectId}
                                 >
                                     <option value="">Sin asignar</option>
+                                    <option value="office">🏢 Oficina</option>
                                     {projectPartners.map(partner => (
                                         <option key={partner.id} value={partner.id}>
                                             {partner.name} ({partner.percentage}%)
@@ -281,46 +420,147 @@ function ExpenseForm() {
                             </div>
                         </div>
 
-                        <div className="form-row">
-                            <div className="form-group" style={{ flex: 1 }}>
+                        {/* Multi-select Lots for Signatures/Escrituras */}
+                        {isSignatures && formData.projectId && (
+                            <div className="form-group" style={{ marginTop: '1rem' }}>
                                 <label className="form-label">
-                                    <FiTag style={{ marginRight: '0.5rem' }} />
-                                    Categoría *
+                                    <FiGrid style={{ marginRight: '0.5rem' }} />
+                                    Lotes para Escritura *
                                 </label>
-                                <select
-                                    name="category"
-                                    className={`form-control ${errors.category ? 'error' : ''}`}
-                                    value={formData.category}
-                                    onChange={handleChange}
-                                >
-                                    {EXPENSE_CATEGORIES.map(group => (
-                                        <optgroup key={group.group} label={group.group}>
-                                            {group.items.map(cat => (
-                                                <option key={cat.value} value={cat.value}>
-                                                    {cat.label} - {cat.description}
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    ))}
-                                </select>
-                                {errors.category && <span className="form-error">{errors.category}</span>}
-                            </div>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                                    Selecciona los lotes vendidos para los cuales se registra pago de escritura. Un pago por lote.
+                                </p>
 
-                            <div className="form-group" style={{ flex: 1 }}>
-                                <label className="form-label">
-                                    <FiCalendar style={{ marginRight: '0.5rem' }} />
-                                    Fecha *
-                                </label>
-                                <input
-                                    type="date"
-                                    name="date"
-                                    className={`form-control ${errors.date ? 'error' : ''}`}
-                                    value={formData.date}
-                                    onChange={handleChange}
-                                />
-                                {errors.date && <span className="form-error">{errors.date}</span>}
+                                {soldLots.length === 0 ? (
+                                    <div style={{
+                                        padding: '1rem',
+                                        background: 'rgba(245, 158, 11, 0.1)',
+                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                        borderRadius: 'var(--radius-md)',
+                                        color: '#b45309',
+                                        fontSize: '0.9rem'
+                                    }}>
+                                        <FiAlertCircle style={{ marginRight: '0.5rem' }} />
+                                        No hay lotes vendidos en este proyecto.
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                        gap: '0.75rem'
+                                    }}>
+                                        {soldLots.map(lot => {
+                                            const selectedEntry = formData.selectedLots.find(sl => sl.lotId === lot.id);
+                                            const isSelected = !!selectedEntry;
+                                            const isFallen = selectedEntry?.isFallen || false;
+                                            const sale = getSaleForLot(lot.id);
+                                            const clientName = sale ? (state.clients.find(c => c.id === sale.clientId)?.name || 'Cliente') : '';
+
+                                            return (
+                                                <div
+                                                    key={lot.id}
+                                                    style={{
+                                                        padding: '0.75rem 1rem',
+                                                        border: `2px solid ${isSelected ? (isFallen ? '#f97316' : 'var(--primary-color, #6366f1)') : 'var(--border-color)'}`,
+                                                        borderRadius: 'var(--radius-lg)',
+                                                        cursor: 'pointer',
+                                                        background: isSelected
+                                                            ? (isFallen ? 'rgba(249, 115, 22, 0.08)' : 'rgba(99, 102, 241, 0.08)')
+                                                            : 'transparent',
+                                                        transition: 'all 0.2s ease',
+                                                    }}
+                                                    onClick={() => handleLotToggle(lot.id)}
+                                                >
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSelected}
+                                                                onChange={() => { }}
+                                                                style={{ width: '18px', height: '18px', accentColor: 'var(--primary-color, #6366f1)' }}
+                                                            />
+                                                            <div>
+                                                                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                                                                    Lote #{lot.number}
+                                                                </div>
+                                                                {clientName && (
+                                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                                        {clientName}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {lot.price && (
+                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                                {formatCurrency(lot.price)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Fallen sale toggle */}
+                                                    {isSelected && (
+                                                        <div
+                                                            style={{
+                                                                marginTop: '0.5rem',
+                                                                paddingTop: '0.5rem',
+                                                                borderTop: '1px solid var(--border-color)',
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <label style={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '0.5rem',
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.8rem',
+                                                                color: isFallen ? '#f97316' : 'var(--text-secondary)',
+                                                            }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isFallen}
+                                                                    onChange={() => handleLotFallenToggle(lot.id)}
+                                                                    style={{ accentColor: '#f97316' }}
+                                                                />
+                                                                <FiAlertCircle style={{ flexShrink: 0 }} />
+                                                                Venta caída — Solo autenticación (${AUTHENTICATION_COST.toLocaleString()})
+                                                            </label>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {errors.selectedLots && <span className="form-error">{errors.selectedLots}</span>}
+
+                                {/* Summary for signatures */}
+                                {calculatedInfo && formData.selectedLots.length > 0 && (
+                                    <div style={{
+                                        marginTop: '1rem',
+                                        padding: '1rem',
+                                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05))',
+                                        borderRadius: 'var(--radius-lg)',
+                                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                                    }}>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                                            Resumen de escrituras:
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                                            {calculatedInfo.normalCount > 0 && (
+                                                <span style={{ fontSize: '0.9rem' }}>
+                                                    ✅ {calculatedInfo.normalCount} lote{calculatedInfo.normalCount !== 1 ? 's' : ''} con escritura normal
+                                                </span>
+                                            )}
+                                            {calculatedInfo.fallenCount > 0 && (
+                                                <span style={{ fontSize: '0.9rem', color: '#f97316' }}>
+                                                    ⚠️ {calculatedInfo.fallenCount} venta{calculatedInfo.fallenCount !== 1 ? 's' : ''} caída{calculatedInfo.fallenCount !== 1 ? 's' : ''} — Solo autenticación: {formatCurrency(calculatedInfo.authCost)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        </div>
+                        )}
 
                         <div className="form-group">
                             <label className="form-label">Notas Adicionales</label>

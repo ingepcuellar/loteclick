@@ -1,6 +1,6 @@
 <?php
 /**
- * PredioClick API - Push Helper
+ * LoteClick API - Push Helper
  * Sends push notifications via Firebase Cloud Messaging (FCM) HTTP v1 API
  * Uses Service Account JSON for authentication
  */

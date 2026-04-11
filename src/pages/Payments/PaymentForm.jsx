@@ -10,10 +10,11 @@ import {
     FiImage,
     FiLoader,
     FiCheck,
-    FiSearch
+    FiSearch,
+    FiCreditCard
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
-import { formatCurrency } from '../../lib/formatters';
+import { formatCurrency, safeParseDate } from '../../lib/formatters';
 import { storageService } from '../../services/storageService';
 import { parseBarcodeInput, generatePaymentReceiptHTML, openPrintWindow, writeToPrintWindow } from '../../lib/barcodeUtils';
 import { pickImage } from '../../lib/cameraUtils';
@@ -30,15 +31,17 @@ function PaymentForm() {
         getClientById,
         getProjectById,
         getPendingAmount,
-        getPendingInstallmentsBySale,
+        getInstallmentsBySale,
         markInstallmentAsPaid,
-        autoRedistributeInstallments
+        autoRedistributeInstallments,
+        refreshData
     } = useApp();
 
     const [formData, setFormData] = useState({
         saleId: preselectedSaleId || '',
         amount: '',
         paymentDate: new Date().toISOString().split('T')[0],
+        paymentMethod: 'cash',
         receiptImage: '',
         notes: '',
     });
@@ -47,6 +50,7 @@ function PaymentForm() {
     const [previewImage, setPreviewImage] = useState(null);
     const [uploadingImage, setUploadingImage] = useState(false);
     const [pendingInstallments, setPendingInstallments] = useState([]);
+    const [allInstallments, setAllInstallments] = useState([]);
     const [selectedInstallmentId, setSelectedInstallmentId] = useState('');
     const [loadingInstallments, setLoadingInstallments] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -98,22 +102,23 @@ function PaymentForm() {
     const pendingAmount = selectedSale ? getPendingAmount(formData.saleId) : 0;
     const isInstallmentSale = selectedSale && (selectedSale.paymentType === 'installments' || selectedSale.paymentType === 'credit' || selectedSale.payment_type === 'credit');
 
-    // Load installments when sale changes
+    // Load ALL installments when sale changes (to show full grid)
     useEffect(() => {
         const loadInstallments = async () => {
             if (formData.saleId && isInstallmentSale) {
                 setLoadingInstallments(true);
                 try {
-                    const { data, error } = await getPendingInstallmentsBySale(formData.saleId);
+                    const { data, error } = await getInstallmentsBySale(formData.saleId);
                     if (!error && data) {
                         // Normalize installment data
                         const normalized = data.map(inst => ({
                             ...inst,
-                            installmentNumber: inst.installment_number || inst.installmentNumber,
+                            installmentNumber: inst.installment_number ?? inst.installmentNumber,
                             dueDate: inst.due_date || inst.dueDate,
-                            paidAmount: inst.paid_amount || inst.paidAmount || 0
+                            paidAmount: parseFloat(inst.paid_amount || inst.paidAmount || 0)
                         }));
-                        setPendingInstallments(normalized);
+                        setAllInstallments(normalized);
+                        setPendingInstallments(normalized.filter(i => i.status !== 'paid'));
                     }
                 } catch (err) {
                     console.error('Error loading installments:', err);
@@ -122,6 +127,7 @@ function PaymentForm() {
                 }
             } else {
                 setPendingInstallments([]);
+                setAllInstallments([]);
             }
             setSelectedInstallmentId('');
         };
@@ -213,6 +219,7 @@ function PaymentForm() {
                 saleId: formData.saleId,
                 amount: paymentAmount,
                 paymentDate: formData.paymentDate,
+                paymentMethod: formData.paymentMethod || 'cash',
                 receiptImage: formData.receiptImage,
                 notes: formData.notes,
             };
@@ -221,10 +228,21 @@ function PaymentForm() {
 
             // 2. Handle installment logic
             if (isInstallmentSale && pendingInstallments.length > 0 && payment && payment.id) {
-                const firstInstallmentAmount = parseFloat(pendingInstallments[0]?.amount || 0);
+                // Use the selected installment (from grid click), or fallback to first pending
+                const targetInstallment = selectedInstallmentId
+                    ? pendingInstallments.find(i => i.id === selectedInstallmentId)
+                    : pendingInstallments[0];
+                const targetAmount = parseFloat(targetInstallment?.amount || 0);
 
-                if (Math.abs(paymentAmount - firstInstallmentAmount) > 0.01) {
-                    // Amount differs from installment — auto redistribute
+                if (selectedInstallmentId && Math.abs(paymentAmount - targetAmount) < 0.01) {
+                    // Exact payment for selected installment — just mark as paid
+                    try {
+                        await markInstallmentAsPaid(selectedInstallmentId, payment.id);
+                    } catch (err) {
+                        console.error('Error marking installment as paid:', err);
+                    }
+                } else {
+                    // Amount differs or no specific installment — auto redistribute
                     try {
                         await autoRedistributeInstallments(
                             formData.saleId,
@@ -233,15 +251,6 @@ function PaymentForm() {
                         );
                     } catch (err) {
                         console.error('Error auto-redistributing installments:', err);
-                    }
-                } else {
-                    // Exact payment — just mark installment as paid
-                    if (selectedInstallmentId) {
-                        try {
-                            await markInstallmentAsPaid(selectedInstallmentId, payment.id);
-                        } catch (err) {
-                            console.error('Error marking installment as paid:', err);
-                        }
                     }
                 }
             }
@@ -281,7 +290,14 @@ function PaymentForm() {
         }
     };
 
-    const navigateAfterPayment = () => {
+    const navigateAfterPayment = async () => {
+        setIsProcessing(true);
+        try {
+            await refreshData();
+        } catch (e) {
+            console.error(e);
+        }
+        
         if (preselectedSaleId) {
             navigate(`/sales/${preselectedSaleId}`);
         } else {
@@ -385,43 +401,160 @@ function PaymentForm() {
                                 </div>
                             )}
 
-                            {/* Installments Section */}
+                            {/* Installments Grid Section */}
                             {isInstallmentSale && selectedSale && (
                                 <div className="form-group">
                                     <label className="form-label">
                                         <FiCalendar style={{ marginRight: '4px' }} />
-                                        Cuota a Pagar
+                                        Seleccionar Cuota a Pagar
                                     </label>
                                     {loadingInstallments ? (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: 'var(--spacing-3)' }}>
                                             <FiLoader style={{ animation: 'spin 1s linear infinite' }} />
                                             <span style={{ color: 'var(--text-muted)' }}>Cargando cuotas...</span>
                                         </div>
-                                    ) : pendingInstallments.length === 0 ? (
+                                    ) : allInstallments.length === 0 ? (
                                         <p style={{ color: 'var(--text-muted)', margin: 0, padding: 'var(--spacing-2)' }}>
-                                            No hay cuotas pendientes. Todas las cuotas han sido pagadas.
+                                            No hay cuotas registradas para esta venta.
                                         </p>
                                     ) : (
                                         <>
-                                            <select
-                                                className="form-input"
-                                                value={selectedInstallmentId}
-                                                onChange={(e) => handleInstallmentChange(e.target.value)}
-                                                style={{ width: '100%' }}
-                                            >
-                                                <option value="">-- Selecciona una cuota --</option>
-                                                {pendingInstallments.map(installment => {
-                                                    const isOverdue = new Date(installment.dueDate) < new Date();
+                                            {/* Installment Grid */}
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                                                gap: 'var(--spacing-3)',
+                                                marginTop: 'var(--spacing-2)'
+                                            }}>
+                                                {allInstallments.map(installment => {
+                                                    const instNum = parseInt(installment.installmentNumber);
+                                                    const isPaid = installment.status === 'paid';
+                                                    const isPartial = installment.status === 'partial';
+                                                    const isOverdue = !isPaid && safeParseDate(installment.dueDate) < new Date();
+                                                    const isSelected = selectedInstallmentId === installment.id;
+                                                    const isSelectable = !isPaid;
+
+                                                    // Label based on installment number
+                                                    let label = `Cuota #${instNum}`;
+                                                    if (instNum === -1) label = 'Separe';
+                                                    else if (instNum === 0) label = 'Inicial';
+
+                                                    // Color based on status
+                                                    let bgColor, borderColor, textColor, statusIcon, statusLabel;
+                                                    if (isPaid) {
+                                                        bgColor = 'rgba(16, 185, 129, 0.12)';
+                                                        borderColor = 'rgba(16, 185, 129, 0.5)';
+                                                        textColor = '#10b981';
+                                                        statusIcon = '✅';
+                                                        statusLabel = 'Pagada';
+                                                    } else if (isPartial) {
+                                                        bgColor = 'rgba(245, 158, 11, 0.12)';
+                                                        borderColor = 'rgba(245, 158, 11, 0.5)';
+                                                        textColor = '#f59e0b';
+                                                        statusIcon = '🟡';
+                                                        statusLabel = `Abonado: ${formatCurrency(installment.paidAmount)}`;
+                                                    } else if (isOverdue) {
+                                                        bgColor = 'rgba(239, 68, 68, 0.12)';
+                                                        borderColor = 'rgba(239, 68, 68, 0.5)';
+                                                        textColor = '#ef4444';
+                                                        statusIcon = '🔴';
+                                                        statusLabel = 'Vencida';
+                                                    } else {
+                                                        bgColor = 'rgba(250, 204, 21, 0.08)';
+                                                        borderColor = 'rgba(250, 204, 21, 0.35)';
+                                                        textColor = '#eab308';
+                                                        statusIcon = '🟡';
+                                                        statusLabel = 'Pendiente';
+                                                    }
+
+                                                    // Selected override
+                                                    if (isSelected) {
+                                                        bgColor = 'rgba(99, 102, 241, 0.15)';
+                                                        borderColor = 'var(--color-primary-500)';
+                                                    }
+
                                                     return (
-                                                        <option key={installment.id} value={installment.id}>
-                                                            Cuota #{installment.installmentNumber === 0 ? 'Inicial (Enganche)' : installment.installmentNumber} - {formatCurrency(installment.amount)} - Vence: {new Date(installment.dueDate).toLocaleDateString('es-CO')}{isOverdue ? ' ⚠️ VENCIDA' : ''}
-                                                        </option>
+                                                        <div
+                                                            key={installment.id}
+                                                            onClick={() => isSelectable && handleInstallmentChange(installment.id)}
+                                                            style={{
+                                                                background: bgColor,
+                                                                border: `2px solid ${borderColor}`,
+                                                                borderRadius: 'var(--radius-lg)',
+                                                                padding: 'var(--spacing-3)',
+                                                                cursor: isSelectable ? 'pointer' : 'default',
+                                                                opacity: isPaid ? 0.6 : 1,
+                                                                transition: 'all 0.2s ease',
+                                                                textAlign: 'center',
+                                                                position: 'relative',
+                                                                transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                                                                boxShadow: isSelected ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none'
+                                                            }}
+                                                        >
+                                                            {/* Label */}
+                                                            <div style={{
+                                                                fontWeight: '700',
+                                                                fontSize: 'var(--font-size-xs)',
+                                                                color: isSelected ? 'var(--color-primary-400)' : textColor,
+                                                                marginBottom: '4px',
+                                                                textTransform: 'uppercase',
+                                                                letterSpacing: '0.5px'
+                                                            }}>
+                                                                {label}
+                                                            </div>
+                                                            {/* Amount */}
+                                                            <div style={{
+                                                                fontWeight: '600',
+                                                                fontSize: 'var(--font-size-base)',
+                                                                color: 'var(--text-primary)',
+                                                                marginBottom: '4px'
+                                                            }}>
+                                                                {formatCurrency(installment.amount)}
+                                                            </div>
+                                                            {/* Due Date */}
+                                                            <div style={{
+                                                                fontSize: 'var(--font-size-xs)',
+                                                                color: 'var(--text-muted)',
+                                                                marginBottom: '4px'
+                                                            }}>
+                                                                {safeParseDate(installment.dueDate).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                                                            </div>
+                                                            {/* Status */}
+                                                            <div style={{
+                                                                fontSize: '0.7rem',
+                                                                color: textColor,
+                                                                fontWeight: '500'
+                                                            }}>
+                                                                {statusIcon} {statusLabel}
+                                                            </div>
+                                                            {/* Selected check */}
+                                                            {isSelected && (
+                                                                <div style={{
+                                                                    position: 'absolute',
+                                                                    top: '4px',
+                                                                    right: '4px',
+                                                                    background: 'var(--color-primary-500)',
+                                                                    color: 'white',
+                                                                    borderRadius: '50%',
+                                                                    width: '18px',
+                                                                    height: '18px',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    fontSize: '10px'
+                                                                }}>
+                                                                    <FiCheck />
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     );
                                                 })}
-                                            </select>
+                                            </div>
+
+                                            {/* Selected installment details */}
                                             {selectedInstallmentId && (
                                                 <div style={{
-                                                    marginTop: 'var(--spacing-2)',
+                                                    marginTop: 'var(--spacing-3)',
                                                     padding: 'var(--spacing-3)',
                                                     background: 'var(--color-primary-500)10',
                                                     borderRadius: 'var(--radius-md)',
@@ -434,22 +567,19 @@ function PaymentForm() {
                                                 </div>
                                             )}
 
-                                            {/* Info: auto-redistribute notice */}
+                                            {/* Legend */}
                                             <div style={{
                                                 marginTop: 'var(--spacing-3)',
-                                                padding: 'var(--spacing-3)',
-                                                background: 'var(--bg-secondary)',
-                                                borderRadius: 'var(--radius-md)',
-                                                fontSize: '0.85rem',
-                                                color: 'var(--text-muted)',
                                                 display: 'flex',
-                                                alignItems: 'flex-start',
-                                                gap: 'var(--spacing-2)'
+                                                gap: 'var(--spacing-4)',
+                                                flexWrap: 'wrap',
+                                                fontSize: 'var(--font-size-xs)',
+                                                color: 'var(--text-muted)'
                                             }}>
-                                                <FiCheck style={{ flexShrink: 0, marginTop: '2px', color: 'var(--color-success)' }} />
-                                                <span>
-                                                    Si pagas menos, la diferencia se sumará a la siguiente cuota. Si pagas más, el excedente se descontará desde la última cuota hacia la primera.
-                                                </span>
+                                                <span>✅ Pagada</span>
+                                                <span>🟡 Pendiente</span>
+                                                <span>🟠 Parcial</span>
+                                                <span>🔴 Vencida</span>
                                             </div>
                                         </>
                                     )}
@@ -488,6 +618,54 @@ function PaymentForm() {
                                         value={formData.paymentDate}
                                         onChange={(e) => setFormData(prev => ({ ...prev, paymentDate: e.target.value }))}
                                     />
+                                </div>
+                            </div>
+
+                            {/* Payment Method */}
+                            <div className="form-group">
+                                <label className="form-label">
+                                    <FiCreditCard style={{ marginRight: '4px' }} />
+                                    Método de Pago
+                                </label>
+                                <div style={{ display: 'flex', gap: 'var(--spacing-3)' }}>
+                                    <button
+                                        type="button"
+                                        className={`btn ${formData.paymentMethod === 'cash' ? 'btn-primary' : 'btn-secondary'}`}
+                                        onClick={() => setFormData(prev => ({ ...prev, paymentMethod: 'cash' }))}
+                                        style={{
+                                            flex: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            padding: 'var(--spacing-3) var(--spacing-4)',
+                                            border: formData.paymentMethod === 'cash'
+                                                ? '2px solid var(--color-primary-500)'
+                                                : '2px solid var(--border-color)',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <span style={{ fontSize: '1.2rem' }}>💵</span> Efectivo
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`btn ${formData.paymentMethod === 'transfer' ? 'btn-primary' : 'btn-secondary'}`}
+                                        onClick={() => setFormData(prev => ({ ...prev, paymentMethod: 'transfer' }))}
+                                        style={{
+                                            flex: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            padding: 'var(--spacing-3) var(--spacing-4)',
+                                            border: formData.paymentMethod === 'transfer'
+                                                ? '2px solid var(--color-primary-500)'
+                                                : '2px solid var(--border-color)',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <span style={{ fontSize: '1.2rem' }}>🏦</span> Transferencia
+                                    </button>
                                 </div>
                             </div>
 

@@ -17,6 +17,9 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { generatePaymentSlipHTML, printDocument } from '../../lib/barcodeUtils';
 import { formatCurrency, formatDateLong as formatDate } from '../../lib/formatters';
+import { brand } from '../../config/brandConfig';
+import { generateContractPDF } from '../../lib/contractPdfGenerator';
+import { contractParamsService } from '../../services/contractParamsService';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 
 function SaleDetail() {
@@ -45,6 +48,23 @@ function SaleDetail() {
     const [showContractModal, setShowContractModal] = useState(false);
     const [showReceiptModal, setShowReceiptModal] = useState(false);
     const [selectedReceipt, setSelectedReceipt] = useState(null);
+    const [isGeneratingContract, setIsGeneratingContract] = useState(false);
+    const [showSepareModal, setShowSepareModal] = useState(false);
+    const [separeSettings, setSepareSettings] = useState({ 
+        amount: '', 
+        date: new Date().toISOString().split('T')[0] 
+    });
+
+    if (state.isLoading) {
+        return (
+            <div className="card">
+                <div className="empty-state" style={{ padding: '3rem' }}>
+                    <div className="spinner"></div>
+                    <h3 style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Cargando datos de la venta...</h3>
+                </div>
+            </div>
+        );
+    }
 
     if (!sale) {
         return (
@@ -75,42 +95,49 @@ function SaleDetail() {
     const progressPercentage = (totalPaid / parseFloat(sale.totalPrice)) * 100;
     const isPaid = pendingAmount <= 0;
 
-    const generateSimpleContract = () => {
-        const contractText = `
-CONTRATO DE COMPRAVENTA DE LOTE
+    const handleGenerateContract = async () => {
+        setIsGeneratingContract(true);
+        try {
+            // Load contract params
+            let contractParams = {};
+            try {
+                const { data: paramsRes } = await contractParamsService.getParams();
+                contractParams = paramsRes?.data || paramsRes || {};
+            } catch (err) {
+                console.warn("Fallo al cargar contract params (CORS/API error). Usando valores por defecto.", err);
+            }
 
-Fecha: ${formatDate(sale.saleDate || sale.createdAt)}
+            contractParams.separeAmount = separeSettings.amount ? parseFloat(separeSettings.amount) : 0;
+            contractParams.separeDate = separeSettings.date;
 
-VENDEDOR:
-${project?.partners?.map(p => `- ${p.name} (${p.percentage}%)`).join('\n') || 'Propietarios del proyecto'}
+            // Get next promesa number
+            let promesaNumber = 1;
+            try {
+                const { data: promRes } = await contractParamsService.getNextPromesa();
+                promesaNumber = promRes?.data?.numero_promesa || 1;
+            } catch (err) {
+                console.warn("Fallo al obtener numero de promesa. Usando 1 por defecto.", err);
+            }
 
-COMPRADOR:
-Nombre: ${client?.name || client?.fullName || 'N/A'}
-Documento: ${client?.document || 'N/A'}
-Dirección: ${client?.address || 'N/A'}
-Teléfono: ${client?.phone || 'N/A'}
+            // Get lot info
+            const lot = project?.lots?.find(l => l.id === sale.lotId);
 
-OBJETO DEL CONTRATO:
-Proyecto: ${project?.name || 'N/A'}
-Ubicación: ${project?.location || 'N/A'}
-Lote No: ${sale.lotNumber}
-${(() => {
-                const lot = project?.lots?.find(l => l.id === sale.lotId);
-                return lot ? `Área: ${lot.area} m²` : '';
-            })()}
-
-PRECIO Y FORMA DE PAGO:
-Precio Total: ${formatCurrency(sale.totalPrice)}
-Forma de Pago: ${sale.paymentType === 'cash' ? 'Contado' : `${sale.numberOfInstallments} cuotas`}
-${sale.downPayment ? `Cuota Inicial: ${formatCurrency(sale.downPayment)}` : ''}
-
-FIRMAS:
-
-_________________________          _________________________
-    VENDEDOR                            COMPRADOR
-    `;
-
-        return contractText;
+            // Generate PDF
+            generateContractPDF({
+                sale,
+                client,
+                project,
+                lot,
+                contractParams,
+                promesaNumber
+            });
+            setShowSepareModal(false);
+        } catch (err) {
+            console.error('Error generating contract:', err);
+            alert('Error al generar el contrato. Verifica que los parámetros de contrato estén configurados.');
+        } finally {
+            setIsGeneratingContract(false);
+        }
     };
 
     // Función para generar factura HTML imprimible
@@ -156,8 +183,8 @@ _________________________          _________________________
     <div class="invoice-container">
         <div class="header">
             <div>
-                <div class="logo">🏡 PredioClick</div>
-                <p style="color: #666; margin-top: 5px;">Sistema de Gestión de Predios</p>
+                <div class="logo">${brand.emoji} ${brand.appName}</div>
+                <p style="color: #666; margin-top: 5px;">${brand.subtitle}</p>
             </div>
             <div class="invoice-info">
                 <div class="invoice-number">${invoiceNumber}</div>
@@ -237,7 +264,7 @@ _________________________          _________________________
         </div>
 
         <div class="footer">
-            <p>Esta factura fue generada automáticamente por PredioClick</p>
+            <p>Esta factura fue generada automáticamente por ${brand.appName}</p>
             <p style="margin-top: 5px;">Fecha de generación: ${new Date().toLocaleDateString('es-CO')} ${new Date().toLocaleTimeString('es-CO')}</p>
         </div>
     </div>
@@ -300,9 +327,14 @@ _________________________          _________________________
                     </button>
                     <button
                         className="btn btn-secondary"
-                        onClick={() => setShowContractModal(true)}
+                        onClick={() => setShowSepareModal(true)}
+                        disabled={isGeneratingContract}
                     >
-                        <FiFileText /> Ver Contrato
+                        {isGeneratingContract ? (
+                            <><span className="spinner" style={{ width: 14, height: 14 }}></span> Generando...</>
+                        ) : (
+                            <><FiFileText /> Generar Contrato PDF</>
+                        )}
                     </button>
                     <Link to={`/payments/new?saleId=${id}`} className="btn btn-primary">
                         <FiPlus /> Registrar Pago
@@ -492,6 +524,7 @@ _________________________          _________________________
                                         <th>#</th>
                                         <th>Fecha</th>
                                         <th>Monto</th>
+                                        <th>Método</th>
                                         <th>Recibo</th>
                                         <th>Notas</th>
                                     </tr>
@@ -506,6 +539,17 @@ _________________________          _________________________
                                             </td>
                                             <td style={{ fontWeight: '600', color: 'var(--color-success)' }}>
                                                 {formatCurrency(payment.amount)}
+                                            </td>
+                                            <td>
+                                                {(payment.paymentMethod || payment.payment_method) === 'transfer' ? (
+                                                    <span className="badge badge-info" style={{ fontSize: 'var(--font-size-xs)' }}>
+                                                        🏦 Transferencia
+                                                    </span>
+                                                ) : (
+                                                    <span className="badge" style={{ fontSize: 'var(--font-size-xs)', background: 'rgba(34, 197, 94, 0.1)', color: '#16a34a', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                                                        💵 Efectivo
+                                                    </span>
+                                                )}
                                             </td>
                                             <td>
                                                 {payment.receiptImage ? (
@@ -551,56 +595,6 @@ _________________________          _________________________
                 </div>
             )}
 
-            {/* Contract Modal */}
-            {showContractModal && (
-                <div className="modal-overlay" onClick={() => setShowContractModal(false)}>
-                    <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3 className="modal-title">Contrato de Compraventa</h3>
-                            <button className="modal-close" onClick={() => setShowContractModal(false)}>×</button>
-                        </div>
-                        <div className="modal-body">
-                            <pre style={{
-                                whiteSpace: 'pre-wrap',
-                                fontFamily: 'monospace',
-                                background: 'var(--bg-tertiary)',
-                                padding: 'var(--spacing-6)',
-                                borderRadius: 'var(--radius-lg)',
-                                fontSize: 'var(--font-size-sm)',
-                                lineHeight: '1.8'
-                            }}>
-                                {generateSimpleContract()}
-                            </pre>
-                            <p style={{
-                                marginTop: 'var(--spacing-4)',
-                                fontSize: 'var(--font-size-sm)',
-                                color: 'var(--text-muted)'
-                            }}>
-                                Nota: Para personalizar este contrato, proporciona el texto del contrato que deseas utilizar.
-                            </p>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowContractModal(false)}>
-                                Cerrar
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                onClick={() => {
-                                    const text = generateSimpleContract();
-                                    const blob = new Blob([text], { type: 'text/plain' });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `Contrato_Lote${sale.lotNumber}_${(client?.name || client?.fullName)?.replace(/\s/g, '_') || 'Cliente'}.txt`;
-                                    a.click();
-                                }}
-                            >
-                                <FiDownload /> Descargar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Receipt Image Modal */}
             {showReceiptModal && selectedReceipt && (
@@ -664,6 +658,50 @@ _________________________          _________________________
                 onConfirm={executeDelete}
                 onCancel={() => setShowConfirmDelete(false)}
             />
+
+            {/* Separe Modal */}
+            {showSepareModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <div className="modal-header">
+                            <h3 className="modal-title">Generar Contrato PDF</h3>
+                            <button className="modal-close" onClick={() => setShowSepareModal(false)}>×</button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ marginBottom: '15px' }}>
+                                Si esta venta tuvo un <strong>"Separe"</strong>, ingrésalo aquí. Esto ajustará la redacción de la Cláusula Cuarta. Si no tuvo separe o pagó la cuota inicial de una sola vez, déjalo en cero.
+                            </p>
+                            <div className="form-group">
+                                <label>Monto del Separe ($)</label>
+                                <input
+                                    type="number"
+                                    className="form-control"
+                                    placeholder="Ej: 500000"
+                                    value={separeSettings.amount}
+                                    onChange={e => setSepareSettings({ ...separeSettings, amount: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-group mb-0">
+                                <label>Fecha del Separe</label>
+                                <input
+                                    type="date"
+                                    className="form-control"
+                                    value={separeSettings.date}
+                                    onChange={e => setSepareSettings({ ...separeSettings, date: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowSepareModal(false)}>
+                                Cancelar
+                            </button>
+                            <button className="btn btn-primary" onClick={handleGenerateContract} disabled={isGeneratingContract}>
+                                {isGeneratingContract ? 'Generando...' : 'Confirmar y Generar PDF'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

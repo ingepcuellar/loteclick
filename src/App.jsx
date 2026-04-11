@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext';
 import { useEffect } from 'react';
 import Layout from './components/Layout/Layout';
 import PushNotificationService from './services/PushNotificationService';
+import { brand } from './config/brandConfig';
 
 // Auth Pages
 import Login from './pages/Auth/Login';
@@ -34,6 +35,7 @@ import UtilityForm from './pages/Utilities/UtilityForm';
 import NotificationList from './pages/Notifications/NotificationList';
 import PushDiagnostic from './pages/PushDiagnostic';
 import Profile from './pages/Profile/Profile';
+import ContractParams from './pages/Settings/ContractParams';
 
 // Protected Route Component
 function ProtectedRoute({ children, requiredRole }) {
@@ -66,7 +68,7 @@ function App() {
     // Initialize push notifications when user is logged in
     useEffect(() => {
         if (isAuthenticated && currentUser) {
-            const token = localStorage.getItem('loteclick_token');
+            const token = localStorage.getItem(brand.tokenKey);
             if (token) {
                 PushNotificationService.initialize(token, (notification) => {
                     // Handle foreground notification - could show a toast
@@ -161,6 +163,9 @@ function App() {
 
                                 {/* Profile */}
                                 <Route path="/profile" element={<Profile />} />
+
+                                {/* Contract Params (Admin) */}
+                                <Route path="/contract-params" element={<ContractParams />} />
 
                                 {/* Fallback */}
                                 <Route path="*" element={<Navigate to="/" replace />} />

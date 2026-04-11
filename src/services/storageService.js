@@ -1,5 +1,5 @@
 /**
- * PredioClick - Storage Service (PHP API)
+ * LoteClick - Storage Service (PHP API)
  * Handles file uploads to cPanel server instead of Supabase Storage
  */
 import { api } from '../lib/apiClient';

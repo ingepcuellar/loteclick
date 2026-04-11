@@ -24,6 +24,17 @@ function ProjectDetail() {
     const project = getProjectById(id);
     const sales = getSalesByProject(id);
 
+    if (state.isLoading) {
+        return (
+            <div className="card">
+                <div className="empty-state" style={{ padding: '3rem' }}>
+                    <div className="spinner"></div>
+                    <h3 style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Cargando datos del proyecto...</h3>
+                </div>
+            </div>
+        );
+    }
+
     if (!project) {
         return (
             <div className="card">

@@ -1,5 +1,5 @@
 /**
- * PredioClick - Commission Agent Service (PHP API)
+ * LoteClick - Commission Agent Service (PHP API)
  */
 import { api } from '../lib/apiClient';
 

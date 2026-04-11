@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { FiSmartphone, FiRefreshCw, FiCheckCircle, FiXCircle, FiAlertTriangle, FiSend } from 'react-icons/fi';
+import { brand } from '../config/brandConfig';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -56,7 +57,7 @@ function PushDiagnostic() {
 
             if (permStatus.receive !== 'granted') {
                 addLog('⚠️ DIAGNÓSTICO', 'error',
-                    'Permisos DENEGADOS. Ve a Ajustes > PredioClick > Notificaciones y activa los permisos.');
+                    `Permisos DENEGADOS. Ve a Ajustes > ${brand.appName} > Notificaciones y activa los permisos.`);
                 setRunning(false);
                 return;
             }
@@ -115,7 +116,7 @@ function PushDiagnostic() {
 
         // Step 4: Send token to backend
         try {
-            const authToken = localStorage.getItem('loteclick_token');
+            const authToken = localStorage.getItem(brand.tokenKey);
             if (!authToken) {
                 addLog('4. Auth Token', 'error', 'No hay token de autenticación. ¿Estás logueado?');
                 setRunning(false);
@@ -156,7 +157,7 @@ function PushDiagnostic() {
     const testSendPush = async () => {
         try {
             addLog('📤 Enviando push de prueba...', 'info', 'Usando endpoint de diagnóstico');
-            const authToken = localStorage.getItem('loteclick_token');
+            const authToken = localStorage.getItem(brand.tokenKey);
 
             const response = await fetch(`${API_URL}/endpoints/push-notifications.php?action=test`, {
                 method: 'POST',

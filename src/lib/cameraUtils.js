@@ -1,5 +1,5 @@
 /**
- * PredioClick - Camera Utilities
+ * LoteClick - Camera Utilities
  * Hybrid camera/photo picker: uses @capacitor/camera on iOS/Android,
  * falls back to <input type="file"> on web.
  */

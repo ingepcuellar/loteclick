@@ -12,11 +12,12 @@ import {
     FiX,
     FiFilter
 } from 'react-icons/fi';
-import { useAuth, ROLE_LABELS } from '../../context/AuthContext';
+import { useAuth, ROLE_LABELS, ROLE_ICONS, getRolesArray } from '../../context/AuthContext';
 
 const ROLE_COLORS = {
     admin: { bg: '#3b82f620', color: '#3b82f6', border: '#3b82f640' },
     seller: { bg: '#10b98120', color: '#10b981', border: '#10b98140' },
+    treasurer: { bg: '#f59e0b20', color: '#f59e0b', border: '#f59e0b40' },
     partner: { bg: '#8b5cf620', color: '#8b5cf6', border: '#8b5cf640' }
 };
 
@@ -32,7 +33,7 @@ function UserList() {
         let result = users;
 
         if (filterRole) {
-            result = result.filter(u => u.role === filterRole);
+            result = result.filter(u => getRolesArray(u).includes(filterRole));
         }
 
         if (searchTerm) {
@@ -97,7 +98,7 @@ function UserList() {
                         <FiShield />
                     </div>
                     <div className="stat-info">
-                        <span className="stat-value">{users.filter(u => u.role === 'admin').length}</span>
+                <span className="stat-value">{users.filter(u => getRolesArray(u).includes('admin')).length}</span>
                         <span className="stat-label">Administradores</span>
                     </div>
                 </div>
@@ -106,8 +107,17 @@ function UserList() {
                         <FiUser />
                     </div>
                     <div className="stat-info">
-                        <span className="stat-value">{users.filter(u => u.role === 'seller').length}</span>
+                        <span className="stat-value">{users.filter(u => getRolesArray(u).includes('seller')).length}</span>
                         <span className="stat-label">Vendedores</span>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                        <FiUser />
+                    </div>
+                    <div className="stat-info">
+                        <span className="stat-value">{users.filter(u => getRolesArray(u).includes('treasurer')).length}</span>
+                        <span className="stat-label">Tesoreros</span>
                     </div>
                 </div>
                 <div className="stat-card">
@@ -115,7 +125,7 @@ function UserList() {
                         <FiUser />
                     </div>
                     <div className="stat-info">
-                        <span className="stat-value">{users.filter(u => u.role === 'partner').length}</span>
+                        <span className="stat-value">{users.filter(u => getRolesArray(u).includes('partner')).length}</span>
                         <span className="stat-label">Socios</span>
                     </div>
                 </div>
@@ -180,7 +190,8 @@ function UserList() {
                                     </thead>
                                     <tbody>
                                         {filteredUsers.map(user => {
-                                            const roleColor = ROLE_COLORS[user.role] || ROLE_COLORS.seller;
+                                            const userRoles = getRolesArray(user);
+                                            const primaryColor = ROLE_COLORS[userRoles[0]] || ROLE_COLORS.seller;
                                             const isDefaultAdmin = user.email === 'admin@loteclick.com';
 
                                             return (
@@ -191,7 +202,7 @@ function UserList() {
                                                                 width: '40px',
                                                                 height: '40px',
                                                                 borderRadius: '50%',
-                                                                background: `linear-gradient(135deg, ${roleColor.color}, ${roleColor.color}80)`,
+                                                                background: `linear-gradient(135deg, ${primaryColor.color}, ${primaryColor.color}80)`,
                                                                 display: 'flex',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
@@ -211,17 +222,24 @@ function UserList() {
                                                         </div>
                                                     </td>
                                                     <td>
-                                                        <span
-                                                            className="badge"
-                                                            style={{
-                                                                background: roleColor.bg,
-                                                                color: roleColor.color,
-                                                                border: `1px solid ${roleColor.border}`
-                                                            }}
-                                                        >
-                                                            <FiShield style={{ marginRight: '4px' }} />
-                                                            {ROLE_LABELS[user.role] || user.role}
-                                                        </span>
+                                                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                            {userRoles.map(r => {
+                                                                const rc = ROLE_COLORS[r] || ROLE_COLORS.seller;
+                                                                return (
+                                                                    <span
+                                                                        key={r}
+                                                                        className="badge"
+                                                                        style={{
+                                                                            background: rc.bg,
+                                                                            color: rc.color,
+                                                                            border: `1px solid ${rc.border}`
+                                                                        }}
+                                                                    >
+                                                                        {ROLE_ICONS[r] || ''} {ROLE_LABELS[r] || r}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </td>
                                                     <td>
                                                         {user.isActive ? (
@@ -264,7 +282,8 @@ function UserList() {
                             {/* Mobile Card View */}
                             <div className="mobile-card-list">
                                 {filteredUsers.map(user => {
-                                    const roleColor = ROLE_COLORS[user.role] || ROLE_COLORS.seller;
+                                    const userRoles = getRolesArray(user);
+                                    const primaryColor = ROLE_COLORS[userRoles[0]] || ROLE_COLORS.seller;
                                     const isDefaultAdmin = user.email === 'admin@loteclick.com';
 
                                     return (
@@ -272,7 +291,7 @@ function UserList() {
                                             <div className="mobile-card-header">
                                                 <div className="mobile-card-main">
                                                     <div className="mobile-card-avatar" style={{
-                                                        background: `linear-gradient(135deg, ${roleColor.color}, ${roleColor.color}80)`
+                                                        background: `linear-gradient(135deg, ${primaryColor.color}, ${primaryColor.color}80)`
                                                     }}>
                                                         {user.name?.charAt(0).toUpperCase() || 'U'}
                                                     </div>
@@ -293,16 +312,22 @@ function UserList() {
                                             </div>
                                             <div className="mobile-card-body">
                                                 <div className="mobile-card-row">
-                                                    <span className="mobile-card-label">Rol</span>
-                                                    <span className="badge" style={{
-                                                        background: roleColor.bg,
-                                                        color: roleColor.color,
-                                                        border: `1px solid ${roleColor.border}`,
-                                                        fontSize: 'var(--font-size-xs)'
-                                                    }}>
-                                                        <FiShield style={{ marginRight: '4px' }} />
-                                                        {ROLE_LABELS[user.role] || user.role}
-                                                    </span>
+                                                    <span className="mobile-card-label">Roles</span>
+                                                    <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                                                        {userRoles.map(r => {
+                                                            const rc = ROLE_COLORS[r] || ROLE_COLORS.seller;
+                                                            return (
+                                                                <span key={r} className="badge" style={{
+                                                                    background: rc.bg,
+                                                                    color: rc.color,
+                                                                    border: `1px solid ${rc.border}`,
+                                                                    fontSize: 'var(--font-size-xs)'
+                                                                }}>
+                                                                    {ROLE_ICONS[r] || ''} {ROLE_LABELS[r] || r}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </Link>

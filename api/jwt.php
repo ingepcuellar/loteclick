@@ -1,6 +1,6 @@
 <?php
 /**
- * PredioClick API - JWT Authentication
+ * LoteClick API - JWT Authentication
  */
 
 require_once __DIR__ . '/config.php';
@@ -60,10 +60,32 @@ function requireAuth() {
 
 /**
  * Require specific role(s)
+ * Supports both single role strings and JSON array roles
  */
 function requireRole(...$roles) {
     $user = requireAuth();
-    if (!in_array($user['role'], $roles)) {
+    $userRole = $user['role'] ?? 'seller';
+
+    // Parse multi-role: could be a JSON array string like '["seller","treasurer"]'
+    $userRoles = [];
+    if (is_string($userRole) && str_starts_with($userRole, '[')) {
+        $parsed = json_decode($userRole, true);
+        if (is_array($parsed)) {
+            $userRoles = $parsed;
+        } else {
+            $userRoles = [$userRole];
+        }
+    } else {
+        // Legacy: single string role or 'seller_treasurer'
+        if ($userRole === 'seller_treasurer') {
+            $userRoles = ['seller', 'treasurer'];
+        } else {
+            $userRoles = [$userRole];
+        }
+    }
+
+    // Check if any of the user's roles match the required roles
+    if (empty(array_intersect($userRoles, $roles))) {
         jsonError('No tienes permisos para esta acción', 403);
     }
     return $user;

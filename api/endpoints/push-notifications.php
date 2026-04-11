@@ -1,6 +1,6 @@
 <?php
 /**
- * PredioClick API - Push Notifications Endpoint
+ * LoteClick API - Push Notifications Endpoint
  * Manages device tokens for push notifications
  */
 require_once __DIR__ . '/../config.php';

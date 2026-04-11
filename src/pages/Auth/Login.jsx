@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { FiLogIn, FiMail, FiLock, FiAlertCircle } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
+import { brand } from '../../config/brandConfig';
 
 function Login() {
     const navigate = useNavigate();
@@ -69,10 +70,10 @@ function Login() {
                 {/* Logo and Title */}
                 <div className="login-header">
                     <div className="login-logo">
-                        <img src="/logo.png" alt="PredioClick" />
+                        <img src={brand.logo} alt={brand.appName} />
                     </div>
-                    <h1>PredioClick</h1>
-                    <p>Sistema de Gestión de Predios</p>
+                    <h1>{brand.appName}</h1>
+                    <p>{brand.subtitle}</p>
                 </div>
 
                 {/* Error Message */}

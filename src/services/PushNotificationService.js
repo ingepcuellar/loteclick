@@ -4,7 +4,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
 const API_URL = import.meta.env.VITE_API_URL;
 
 /**
- * Push Notification Service for PredioClick
+ * Push Notification Service for LoteClick
  * Handles registration, permissions, and push events on iOS/Android
  */
 class PushNotificationService {

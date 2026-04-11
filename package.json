@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:jvj": "vite --mode jvj",
     "build": "vite build",
+    "build:jvj": "vite build --mode jvj",
     "preview": "vite preview",
     "cap:sync": "npx cap sync"
   },

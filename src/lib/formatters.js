@@ -1,5 +1,5 @@
 /**
- * Shared formatting utilities for PredioClick
+ * Shared formatting utilities for LoteClick
  * Centralizes currency and date formatting to avoid duplication across components.
  */
 
@@ -18,12 +18,28 @@ export const formatCurrency = (amount) => {
 };
 
 /**
+ * Safely parse a date string, avoiding the UTC-midnight timezone bug.
+ * Date-only strings like "2024-05-15" are parsed as UTC midnight by JS,
+ * which in negative-offset timezones (e.g. UTC-5 Colombia) becomes the
+ * previous day. Appending T12:00:00 anchors at noon, preventing this.
+ * @param {string|Date} dateString
+ * @returns {Date}
+ */
+export const safeParseDate = (dateString) => {
+    if (dateString instanceof Date) return dateString;
+    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return new Date(dateString + 'T12:00:00');
+    }
+    return new Date(dateString);
+};
+
+/**
  * Format a date string to short Spanish locale format.
  * @param {string|Date} dateString - The date to format
  * @returns {string} Formatted date string (e.g., "22 feb 2026")
  */
 export const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
+    return safeParseDate(dateString).toLocaleDateString('es-CO', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -36,7 +52,7 @@ export const formatDate = (dateString) => {
  * @returns {string} Formatted date string (e.g., "22 de febrero de 2026")
  */
 export const formatDateLong = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
+    return safeParseDate(dateString).toLocaleDateString('es-CO', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
