@@ -67,6 +67,7 @@ jobs:
             DEVELOPMENT_TEAM=C59HC2JBRC \
             CODE_SIGN_STYLE=Automatic \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            MARKETING_VERSION=2.0.0 \
             -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8 \
             -authenticationKeyID ${{ secrets.APPLE_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APPLE_ISSUER_ID }} \
@@ -93,6 +94,6 @@ jobs:
             --apple-id 6759450478 \
             --bundle-id com.loteclick.app \
             --bundle-version ${{ github.run_number }} \
-            --bundle-short-version-string 1.0.0 \
+            --bundle-short-version-string 2.0.0 \
             --apiKey ${{ secrets.APPLE_KEY_ID }} \
             --apiIssuer ${{ secrets.APPLE_ISSUER_ID }}
