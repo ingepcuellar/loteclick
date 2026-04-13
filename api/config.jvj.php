@@ -1,39 +1,30 @@
 <?php
 /**
- * LoteClick API - Configuration (JVJ Constructores)
- * 
- * ⚠️ INSTRUCCIONES DE DESPLIEGUE:
- * 1. Sube este archivo al hosting de jvjconstructores.com
- * 2. Renómbralo a config.php (reemplaza el original)
- * 3. Actualiza las credenciales de BD con las del hosting
- * 4. Cambia JWT_SECRET por una clave única y segura
+ * J.V.J Constructores Inmobiliarios S.A.S - API Configuration
  */
 
 // Error reporting (disable in production)
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-// ─── Database Configuration ──────────────────────────────────────
-// ⚠️ ACTUALIZAR con las credenciales del hosting de JVJ
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'jvjco_DB');           // Nombre de la BD en cPanel
-define('DB_USER', 'jvjco_admin');        // Usuario de la BD en cPanel
-define('DB_PASS', 'CAMBIAR_CONTRASEÑA'); // Contraseña de la BD en cPanel
+// Database Configuration
+define('DB_HOST', '207.174.214.13');
+define('DB_NAME', 'jvjco2a0_DB');
+define('DB_USER', 'jvjco2a0_admin');
+define('DB_PASS', 'Admin2026*');
 
-// ─── JWT Secret ──────────────────────────────────────────────────
-// ⚠️ CAMBIAR por una clave única y diferente a PredioClick
-define('JWT_SECRET', 'JVJ_constructores_jwt_secret_CAMBIAR_2026');
+// JWT Secret
+define('JWT_SECRET', 'JVJ_Constructores_jwt_secret_key_2026_secure');
 define('JWT_EXPIRY', 86400 * 7); // 7 days
 
-// ─── Upload Settings ─────────────────────────────────────────────
+// Upload settings
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
 define('MAX_FILE_SIZE', 5 * 1024 * 1024); // 5MB
 
-// ─── Firebase Cloud Messaging (Push Notifications) ───────────────
-// Coloca el archivo JSON de la cuenta de servicio de Firebase de JVJ
+// Firebase Cloud Messaging (Push Notifications)
 define('FCM_SERVICE_ACCOUNT_PATH', __DIR__ . '/firebase-service-account.json');
 
-// ─── CORS Headers ────────────────────────────────────────────────
+// CORS Headers
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');

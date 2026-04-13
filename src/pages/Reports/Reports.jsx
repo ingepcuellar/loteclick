@@ -844,7 +844,7 @@ function Reports() {
 
                     {(() => {
                         // Build cartera data
-                        const monthStart = new Date(`${carteraYear}-${carteraMonth}-01T00:00:00`);
+                        const monthStart = new Date(parseInt(carteraYear), parseInt(carteraMonth) - 1, 1);
                         const monthEnd = new Date(monthStart);
                         monthEnd.setMonth(monthEnd.getMonth() + 1);
                         monthEnd.setDate(0);
@@ -897,7 +897,7 @@ function Reports() {
 
                         const totalPaidInMonth = rows.reduce((sum, r) => sum + r.paidInMonth, 0);
                         const totalBalance = rows.reduce((sum, r) => sum + r.balance, 0);
-                        const monthLabel = new Date(`${carteraYear}-${carteraMonth}-01`).toLocaleString('es-CO', { month: 'long', year: 'numeric' });
+                        const monthLabel = new Date(parseInt(carteraYear), parseInt(carteraMonth) - 1, 1).toLocaleString('es-CO', { month: 'long', year: 'numeric' });
 
                         if (rows.length === 0) {
                             return <p className="text-muted text-center">No hay ventas registradas{carteraProject ? ' para este proyecto' : ''}</p>;

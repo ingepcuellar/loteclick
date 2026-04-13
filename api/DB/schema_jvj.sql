@@ -1,7 +1,7 @@
 -- =============================================
--- LoteClick - Schema Completo para JVJ Constructores
--- Base de datos NUEVA desde cero
--- Incluye: schema base + migrations v2 + v3 + v4 + v5 + v6
+-- J.V.J Constructores Inmobiliarios S.A.S
+-- Schema Completo - Base de datos NUEVA desde cero
+-- Incluye: schema base + migrations v2-v7 + device_tokens
 -- =============================================
 
 -- ─── PROFILES (Usuarios) ─────────────────────────────────────────
@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS profiles (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    -- v6: VARCHAR para soportar arrays JSON de roles múltiples ej: '["seller","treasurer"]'
     role VARCHAR(100) NOT NULL DEFAULT 'seller',
     is_active TINYINT(1) DEFAULT 1,
     associated_projects JSON DEFAULT NULL,
@@ -49,7 +48,6 @@ CREATE TABLE IF NOT EXISTS lots (
     number INT NOT NULL,
     area DECIMAL(10,2),
     price DECIMAL(15,2),
-    -- v2: incluye 'pending_initial'
     status ENUM('available', 'reserved', 'sold', 'pending_initial') DEFAULT 'available',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -96,12 +94,9 @@ CREATE TABLE IF NOT EXISTS sales (
     down_payment DECIMAL(15,2) DEFAULT 0,
     installments INT DEFAULT 1,
     notes TEXT,
-    -- v2: commission agent
     commission_agent VARCHAR(255) DEFAULT NULL,
     commission_agent_id CHAR(36) DEFAULT NULL,
-    -- v5: commission amount
     commission_amount DECIMAL(15,2) DEFAULT NULL,
-    -- v5: discount tracking
     original_price DECIMAL(15,2) DEFAULT NULL,
     discount_amount DECIMAL(15,2) DEFAULT NULL,
     discount_authorized_by CHAR(36) DEFAULT NULL,
@@ -138,13 +133,10 @@ CREATE TABLE IF NOT EXISTS expenses (
     partner_id CHAR(36),
     description VARCHAR(500) NOT NULL,
     amount DECIMAL(15,2) NOT NULL,
-    -- v3: VARCHAR flexible para categorías
     category VARCHAR(50) NOT NULL DEFAULT 'other',
     expense_date DATE NOT NULL,
     notes TEXT,
-    -- v2: attachment
     attachment TEXT DEFAULT NULL,
-    -- v3: multi-lot tracking para Firmas y Escrituras
     selected_lots JSON DEFAULT NULL,
     created_by CHAR(36),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -231,6 +223,36 @@ CREATE TABLE IF NOT EXISTS sale_lots (
     FOREIGN KEY (lot_id) REFERENCES lots(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ─── CONTRACT PARAMS (Parámetros de Contrato) ───────────────────
+CREATE TABLE IF NOT EXISTS contract_params (
+    id CHAR(36) PRIMARY KEY,
+    vendor_name VARCHAR(255) NOT NULL DEFAULT '',
+    vendor_document VARCHAR(100) NOT NULL DEFAULT '',
+    vendor_phone VARCHAR(50) DEFAULT '',
+    vendor_address VARCHAR(500) DEFAULT '',
+    matricula_inmobiliaria VARCHAR(100) DEFAULT '',
+    porcentaje_cuota VARCHAR(20) DEFAULT '0.052%',
+    ciudad VARCHAR(100) DEFAULT 'Villavicencio - Meta',
+    notaria_nombre VARCHAR(255) DEFAULT '',
+    notaria_ciudad VARCHAR(100) DEFAULT '',
+    escritura_fecha DATE DEFAULT NULL,
+    escritura_hora VARCHAR(20) DEFAULT '03:00 PM',
+    titulo_propiedad TEXT,
+    ultimo_numero_promesa INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ─── DEVICE TOKENS (Push Notifications) ─────────────────────────
+CREATE TABLE IF NOT EXISTS device_tokens (
+    id CHAR(36) PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    token TEXT NOT NULL,
+    platform VARCHAR(20) DEFAULT 'web',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ─── INDEXES ─────────────────────────────────────────────────────
 CREATE INDEX idx_partners_project ON partners(project_id);
 CREATE INDEX idx_lots_project ON lots(project_id);
@@ -247,6 +269,7 @@ CREATE INDEX idx_disbursements_partner ON partner_disbursements(partner_id);
 CREATE INDEX idx_utility_sale ON utility_registrations(sale_id);
 CREATE INDEX idx_utility_status ON utility_registrations(status);
 CREATE INDEX idx_utility_type ON utility_registrations(service_type);
+CREATE INDEX idx_device_tokens_user ON device_tokens(user_id);
 
 -- ─── USUARIO ADMIN POR DEFECTO ──────────────────────────────────
 -- Contraseña: admin123 (bcrypt hash)
