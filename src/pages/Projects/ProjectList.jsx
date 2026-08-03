@@ -9,8 +9,24 @@ import EmptyState from '../../components/ui/EmptyState';
 
 function ProjectList() {
     const { state, deleteProject } = useApp();
-    const { isSeller, isAdmin } = useAuth();
+    const { isSeller, isAdmin, isPartner, currentUser } = useAuth();
     const [confirmDelete, setConfirmDelete] = useState(null);
+
+    // Filtrar proyectos según el rol: socios (sin admin) solo ven sus proyectos vinculados
+    const partnerProjectIds = currentUser?.associated_projects || currentUser?.associatedProjects || [];
+    const partnerNameLower = (currentUser?.name || '').toLowerCase().trim();
+    const visibleProjects = isPartner() && !isAdmin() && currentUser?.id
+        ? state.projects.filter(p => {
+            // Mecanismo 1: associated_projects del perfil (más confiable)
+            if (partnerProjectIds.includes(p.id) || partnerProjectIds.includes(String(p.id))) return true;
+            // Mecanismo 2: user_id en tabla partners (campo real en BD, snake_case)
+            if ((p.partners || []).some(pt => String(pt.user_id) === String(currentUser.id))) return true;
+            // Mecanismo 3: por nombre (fallback)
+            return (p.partners || []).some(pt =>
+                partnerNameLower && pt.name?.toLowerCase().trim() === partnerNameLower
+            );
+        })
+        : state.projects;
 
     const handleDelete = (projectId, projectName) => {
         setConfirmDelete({ id: projectId, name: projectName });
@@ -25,7 +41,8 @@ function ProjectList() {
 
     const getProjectStats = (project) => {
         const totalLots = project.lots?.length || 0;
-        const soldLots = project.lots?.filter(l => l.status === 'sold').length || 0;
+        // Count both 'sold' and 'pending_initial' as sold (credit sale = already sold)
+        const soldLots = project.lots?.filter(l => l.status === 'sold' || l.status === 'pending_initial').length || 0;
         const availableLots = totalLots - soldLots;
         const progress = totalLots > 0 ? (soldLots / totalLots) * 100 : 0;
 
@@ -46,19 +63,18 @@ function ProjectList() {
             />
 
             {/* Projects Grid */}
-            {state.projects.length === 0 ? (
+            {visibleProjects.length === 0 ? (
                 <div className="card">
                     <EmptyState
                         icon={FiFolder}
-                        title="No hay proyectos"
-                        description="Crea tu primer proyecto para comenzar a gestionar la venta de lotes"
-                        actionLabel="Crear Proyecto"
-                        actionTo="/projects/new"
+                        title={isPartner() ? 'Sin proyectos asignados' : 'No hay proyectos'}
+                        description={isPartner() ? 'Aún no tienes proyectos asignados. Contacta al administrador.' : 'Crea tu primer proyecto para comenzar a gestionar la venta de lotes'}
+                        {...(!isPartner() && { actionLabel: 'Crear Proyecto', actionTo: '/projects/new' })}
                     />
                 </div>
             ) : (
                 <div className="grid grid-3">
-                    {state.projects.map(project => {
+                    {visibleProjects.map(project => {
                         const stats = getProjectStats(project);
 
                         return (

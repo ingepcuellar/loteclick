@@ -16,8 +16,9 @@ import {
 import { useApp } from '../../context/AppContext';
 import { disbursementService } from '../../services/disbursementService';
 import { storageService } from '../../services/storageService';
-import { formatCurrency } from '../../lib/formatters';
+import { formatCurrency, todayBogota } from '../../lib/formatters';
 import { pickImage } from '../../lib/cameraUtils';
+import CurrencyInput from '../../components/ui/CurrencyInput';
 
 function DisbursementForm() {
     const navigate = useNavigate();
@@ -31,8 +32,9 @@ function DisbursementForm() {
         projectId: '',
         partnerId: '',
         amount: '',
-        disbursementDate: new Date().toISOString().split('T')[0],
+        disbursementDate: todayBogota(),
         notes: '',
+        paymentMethod: 'cash',
     });
 
     const [partners, setPartners] = useState([]);
@@ -42,12 +44,39 @@ function DisbursementForm() {
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState({});
 
+    // Ítem 4a: Calcular distribución sugerida basada en porcentaje del socio
+    const [suggestedAmount, setSuggestedAmount] = useState(null);
+
+    const calculateSuggested = (projectId, partnerId) => {
+        if (!projectId || !partnerId) { setSuggestedAmount(null); return; }
+        const project = projects.find(p => p.id === projectId);
+        const partner = project?.partners?.find(p => p.id === partnerId);
+        if (!partner || !project) { setSuggestedAmount(null); return; }
+
+        // Ingresos del proyecto (pagos de todas sus ventas)
+        const projectSales = (state.sales || []).filter(s => s.projectId === projectId);
+        const projectIncome = (state.payments || []).filter(p => {
+            const sale = projectSales.find(s => s.id === (p.saleId || p.sale_id));
+            return !!sale;
+        }).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+
+        // Gastos del proyecto
+        const projectExpenses = (state.expenses || []).filter(
+            e => (e.projectId || e.project_id) === projectId
+        ).reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+
+        const netBase = Math.max(0, projectIncome - projectExpenses);
+        const suggested = Math.round((netBase * partner.percentage / 100) / 1000) * 1000;
+        setSuggestedAmount({ amount: suggested, percentage: partner.percentage, netBase, projectIncome, projectExpenses });
+    };
+
     // Load partners for selected project
     useEffect(() => {
         if (formData.projectId) {
             const project = projects.find(p => p.id === formData.projectId);
             setPartners(project?.partners || []);
             setFormData(prev => ({ ...prev, partnerId: '' }));
+            setSuggestedAmount(null); // Ítem 4a
         } else {
             setPartners([]);
         }
@@ -161,6 +190,7 @@ function DisbursementForm() {
                 partner_id: formData.partnerId,
                 amount: parseFloat(formData.amount),
                 disbursement_date: formData.disbursementDate,
+                payment_method: formData.paymentMethod,
                 receipt_image: receiptImageUrl,
                 signature_image: signatureImageUrl,
                 notes: formData.notes,
@@ -218,7 +248,10 @@ function DisbursementForm() {
                     </label>
                     <select
                         value={formData.partnerId}
-                        onChange={(e) => setFormData(prev => ({ ...prev, partnerId: e.target.value }))}
+                        onChange={(e) => {
+                            setFormData(prev => ({ ...prev, partnerId: e.target.value }));
+                            calculateSuggested(formData.projectId, e.target.value); // Ítem 4a
+                        }}
                         className={`form-control ${errors.partnerId ? 'error' : ''}`}
                         disabled={!formData.projectId}
                     >
@@ -235,14 +268,11 @@ function DisbursementForm() {
                     <label className="form-label">
                         <FiDollarSign /> Monto *
                     </label>
-                    <input
-                        type="number"
+                    <CurrencyInput
                         value={formData.amount}
                         onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                         className={`form-control ${errors.amount ? 'error' : ''}`}
                         placeholder="0"
-                        min="0"
-                        step="1"
                     />
                     {formData.amount && (
                         <small style={{ color: 'var(--primary)', fontWeight: 600 }}>
@@ -250,6 +280,36 @@ function DisbursementForm() {
                         </small>
                     )}
                     {errors.amount && <span className="form-error">{errors.amount}</span>}
+
+                    {/* Ítem 4a: Distribución sugerida */}
+                    {suggestedAmount && (
+                        <div style={{
+                            marginTop: '0.5rem', padding: '0.75rem 1rem',
+                            background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.05))',
+                            border: '1px solid rgba(16,185,129,0.3)',
+                            borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                                <div>
+                                    <div style={{ fontWeight: 600, color: 'var(--color-success)', marginBottom: '2px' }}>
+                                        💡 Distribución sugerida: {formatCurrency(suggestedAmount.amount)}
+                                    </div>
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                                        {suggestedAmount.percentage}% de utilidad neta {formatCurrency(suggestedAmount.netBase)}
+                                        {' '}(Ingresos: {formatCurrency(suggestedAmount.projectIncome)} − Gastos: {formatCurrency(suggestedAmount.projectExpenses)})
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary btn-sm"
+                                    onClick={() => setFormData(prev => ({ ...prev, amount: String(suggestedAmount.amount) }))}
+                                    style={{ whiteSpace: 'nowrap' }}
+                                >
+                                    Usar sugerido
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Date */}
@@ -266,6 +326,22 @@ function DisbursementForm() {
                     {errors.disbursementDate && <span className="form-error">{errors.disbursementDate}</span>}
                 </div>
 
+                {/* Modalidad de Pago */}
+                <div className="form-group">
+                    <label className="form-label">
+                        <FiDollarSign /> Modalidad de Pago
+                    </label>
+                    <select
+                        value={formData.paymentMethod}
+                        onChange={(e) => setFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                        className="form-select"
+                    >
+                        <option value="cash">💵 Efectivo</option>
+                        <option value="transfer">🏦 Transferencia Bancaria</option>
+                        <option value="check">📋 Cheque</option>
+                    </select>
+                </div>
+
                 {/* Notes */}
                 <div className="form-group">
                     <label className="form-label">
@@ -279,6 +355,7 @@ function DisbursementForm() {
                         placeholder="Notas adicionales..."
                     />
                 </div>
+
 
                 {/* Evidence: Signature or Receipt */}
                 <div className="form-group">

@@ -7,21 +7,24 @@ export const ROLES = {
     ADMIN: 'admin',
     SELLER: 'seller',
     TREASURER: 'treasurer',
-    PARTNER: 'partner'
+    PARTNER: 'partner',
+    PARTNER_SECONDARY: 'partner_secondary' // Ítem 15: Socio Secundario (solo lectura)
 };
 
 export const ROLE_LABELS = {
     admin: 'Administrador',
     seller: 'Vendedor',
     treasurer: 'Tesorero',
-    partner: 'Socio'
+    partner: 'Socio',
+    partner_secondary: 'Socio Secundario' // Ítem 15
 };
 
 export const ROLE_ICONS = {
     admin: '🔐',
     seller: '💼',
     treasurer: '💰',
-    partner: '🤝'
+    partner: '🤝',
+    partner_secondary: '👤' // Ítem 15
 };
 
 /**
@@ -47,81 +50,109 @@ export function getRolesArray(profile) {
     return [raw];
 }
 
-// Permissions by module
+// Permissions by module — granular RBAC (Ítem 11)
+// Actions: 'view' | 'create' | 'edit' | 'delete' | 'view_own' | 'all'
+// 'view_own' = can view but only records scoped to their own projects
+// 'all'      = bypasses all checks (admin shortcut)
 export const PERMISSIONS = {
     dashboard: {
-        admin: ['view', 'all'],
-        seller: [],
+        admin:     ['view', 'all'],
+        seller:    [],
         treasurer: [],
-        partner: ['view', 'own']
+        partner:   ['view', 'view_own']
     },
     projects: {
-        admin: ['view', 'create', 'edit', 'delete'],
-        seller: ['view'],
-        treasurer: [],
-        partner: ['view_own']
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    ['view'],             // read-only
+        treasurer: [],                   // no access
+        partner:   ['view', 'view_own']  // own projects only
     },
     clients: {
-        admin: ['view', 'create', 'edit', 'delete'],
-        seller: ['view', 'create', 'edit', 'delete'],
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    [],                   // no access (Ítem 7 / Ítem 11)
         treasurer: [],
-        partner: []
+        partner:   []
     },
     sales: {
-        admin: ['view', 'create', 'edit', 'delete'],
-        seller: ['view', 'create', 'edit', 'delete'],
-        treasurer: ['view', 'create', 'edit', 'delete'],
-        partner: ['view_own']
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    ['view'],             // read-only
+        treasurer: [],                   // no access
+        partner:   ['view', 'view_own', 'create', 'edit', 'delete']
     },
     payments: {
-        admin: ['view', 'create', 'edit', 'delete'],
-        seller: [],
-        treasurer: ['view', 'create', 'edit', 'delete'],
-        partner: ['view_own']
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    [],                   // no access
+        treasurer: ['view'],             // read-only
+        partner:   ['view', 'view_own', 'create', 'edit', 'delete']
     },
     expenses: {
-        admin: ['view', 'create', 'edit', 'delete'],
-        seller: [],
-        treasurer: ['view', 'create', 'edit'],
-        partner: ['view_own']
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    [],                   // no access
+        treasurer: ['view'],             // read-only
+        partner:   ['view', 'view_own', 'create', 'edit', 'delete']
     },
     treasury: {
-        admin: ['view', 'create', 'edit', 'delete'],
-        seller: [],
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    [],
         treasurer: [],
-        partner: []
+        partner:   []
     },
     disbursements: {
-        admin: ['view', 'create', 'edit', 'delete'],
-        seller: [],
-        treasurer: ['view', 'create', 'edit', 'delete'],
-        partner: ['view_own']
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    [],                   // no access
+        treasurer: ['view'],             // read-only
+        partner:   ['view', 'view_own', 'create', 'edit', 'delete']
     },
-    reports: {
-        admin: ['view'],
-        seller: [],
-        treasurer: ['view'],
-        partner: ['view_own']
-    },
-    contract_params: {
-        admin: ['view', 'edit'],
-        seller: ['view', 'edit'],
-        treasurer: ['view', 'edit'],
-        partner: []
-    },
-    users: {
-        admin: ['view', 'create', 'edit', 'delete'],
-        seller: [],
-        treasurer: [],
-        partner: []
+    desistimientos: {
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    [],
+        treasurer: ['view'],             // read-only
+        partner:   ['view', 'view_own', 'create', 'edit', 'delete']
     },
     utilities: {
-        admin: ['view', 'create', 'edit', 'delete'],
-        seller: ['view', 'create', 'edit'],
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    [],
+        treasurer: ['view'],             // read-only
+        partner:   ['view', 'view_own', 'create', 'edit', 'delete']
+    },
+    reports: {
+        admin:     ['view', 'all'],
+        seller:    ['view'],             // own-scope reports
+        treasurer: ['view'],             // own-scope reports
+        partner:   ['view', 'view_own']  // all report types, own data
+    },
+    contract_params: {
+        admin:     ['view', 'edit'],
+        seller:    ['view', 'edit'],
+        treasurer: ['view', 'edit'],
+        partner:   [],
+        partner_secondary: []
+    },
+    users: {
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    [],
+        treasurer: [],
+        partner:   [],
+        partner_secondary: []
+    },
+    bank_reconciliation: {
+        admin:     ['view', 'create', 'edit', 'delete'],
+        seller:    [],
         treasurer: ['view', 'create', 'edit'],
-        partner: ['view']
+        partner:   [],
+        partner_secondary: []
     }
 };
+
+// Ítem 15: Permisos de Socio Secundario (solo lectura de sus datos)
+// Hereda visión de partner pero sin create/edit/delete
+Object.keys(PERMISSIONS).forEach(module => {
+    if (!PERMISSIONS[module].partner_secondary) {
+        const partnerPerms = PERMISSIONS[module].partner || [];
+        PERMISSIONS[module].partner_secondary = partnerPerms
+            .filter(p => p !== 'create' && p !== 'edit' && p !== 'delete');
+    }
+});
 
 // Initial State
 const initialState = {
@@ -421,6 +452,11 @@ export function AuthProvider({ children }) {
         return allPerms.has(action) || allPerms.has('all');
     }, [state.profile, state.currentUser]);
 
+    // hasAction — explicit CRUD check: 'view' | 'create' | 'edit' | 'delete'
+    const hasAction = useCallback((module, action) => {
+        return hasPermission(module, action);
+    }, [hasPermission]);
+
     const canAccessModule = useCallback((module) => {
         const userRoles = getRolesArray(state.profile || state.currentUser);
         if (!userRoles.length) return false;
@@ -440,7 +476,13 @@ export function AuthProvider({ children }) {
 
     const isPartner = useCallback(() => {
         const userRoles = getRolesArray(state.profile || state.currentUser);
-        return userRoles.includes(ROLES.PARTNER);
+        return userRoles.includes(ROLES.PARTNER) || userRoles.includes(ROLES.PARTNER_SECONDARY);
+    }, [state.profile, state.currentUser]);
+
+    // Ítem 15: helper específico para Socio Secundario
+    const isSecondaryPartner = useCallback(() => {
+        const userRoles = getRolesArray(state.profile || state.currentUser);
+        return userRoles.includes(ROLES.PARTNER_SECONDARY) && !userRoles.includes(ROLES.PARTNER);
     }, [state.profile, state.currentUser]);
 
     const isTreasurer = useCallback(() => {
@@ -476,9 +518,11 @@ export function AuthProvider({ children }) {
         users: state.users,
         // Permissions
         hasPermission,
+        hasAction,
         canAccessModule,
         isAdmin,
         isPartner,
+        isSecondaryPartner, // Ítem 15
         isTreasurer,
         isSeller,
         getAssociatedProjects,
@@ -486,7 +530,8 @@ export function AuthProvider({ children }) {
         // Constants
         ROLES,
         ROLE_LABELS,
-        ROLE_ICONS
+        ROLE_ICONS,
+        PERMISSIONS // Ítem 15: exponer para UserForm
     };
 
     return (

@@ -56,18 +56,48 @@ function handleLogin() {
     unset($user['password']);
     $user['is_active'] = (bool)$user['is_active'];
     if ($user['associated_projects']) {
-        $user['associated_projects'] = json_decode($user['associated_projects'], true);
+        $user['associated_projects'] = json_decode($user['associated_projects'], true) ?: [];
     } else {
         $user['associated_projects'] = [];
+    }
+
+    // Inferir proyectos si está vacío (socio listado en project.partners[] sin campo en perfil)
+    if (empty($user['associated_projects'])) {
+        $userName = strtolower(trim($user['name'] ?? ''));
+        if ($userName) {
+            try {
+                $projStmt = $pdo->query("SELECT id, partners FROM projects WHERE partners IS NOT NULL AND partners != '' AND partners != '[]'");
+                $projects = $projStmt->fetchAll();
+                $inferredIds = [];
+                foreach ($projects as $proj) {
+                    $partners = json_decode($proj['partners'], true) ?: [];
+                    foreach ($partners as $p) {
+                        if (!empty($p['name']) && strtolower(trim($p['name'])) === $userName) {
+                            $inferredIds[] = $proj['id'];
+                            break;
+                        }
+                    }
+                }
+                if ($inferredIds) {
+                    $user['associated_projects'] = $inferredIds;
+                    // Actualizar BD para futuras sesiones
+                    try {
+                        $updStmt = $pdo->prepare("UPDATE profiles SET associated_projects = ? WHERE id = ?");
+                        $updStmt->execute([json_encode($inferredIds), $user['id']]);
+                    } catch (Exception $e) {}
+                }
+            } catch (Exception $e) {}
+        }
     }
 
     jsonResponse([
         'data' => [
             'token' => $token,
-            'user' => $user
+            'user'  => $user
         ]
     ]);
 }
+
 
 function handleMe() {
     if (getMethod() !== 'GET') jsonError('Método no permitido', 405);
@@ -83,9 +113,39 @@ function handleMe() {
     unset($user['password']);
     $user['is_active'] = (bool)$user['is_active'];
     if ($user['associated_projects']) {
-        $user['associated_projects'] = json_decode($user['associated_projects'], true);
+        $user['associated_projects'] = json_decode($user['associated_projects'], true) ?: [];
     } else {
         $user['associated_projects'] = [];
+    }
+
+    // Si associated_projects está vacío, inferirlo desde los proyectos
+    // (el socio puede estar listado en project.partners[] aunque no tenga el campo en su perfil)
+    if (empty($user['associated_projects'])) {
+        $userName = strtolower(trim($user['name'] ?? ''));
+        if ($userName) {
+            try {
+                $projStmt = $pdo->query("SELECT id, partners FROM projects WHERE partners IS NOT NULL AND partners != '' AND partners != '[]'");
+                $projects = $projStmt->fetchAll();
+                $inferredIds = [];
+                foreach ($projects as $proj) {
+                    $partners = json_decode($proj['partners'], true) ?: [];
+                    foreach ($partners as $p) {
+                        if (!empty($p['name']) && strtolower(trim($p['name'])) === $userName) {
+                            $inferredIds[] = $proj['id'];
+                            break; // ya encontramos este proyecto, pasar al siguiente
+                        }
+                    }
+                }
+                if ($inferredIds) {
+                    $user['associated_projects'] = $inferredIds;
+                    // También actualizar la BD para que futuras consultas sean más rápidas
+                    try {
+                        $updStmt = $pdo->prepare("UPDATE profiles SET associated_projects = ? WHERE id = ?");
+                        $updStmt->execute([json_encode($inferredIds), $user['id']]);
+                    } catch (Exception $e) {}
+                }
+            } catch (Exception $e) {}
+        }
     }
 
     jsonResponse(['data' => $user]);
@@ -101,6 +161,10 @@ function handleRegister() {
     $password = $body['password'] ?? '';
     $name = trim($body['name'] ?? '');
     $role = $body['role'] ?? 'seller';
+    
+    // Force uppercase
+    forceUppercase($body, ['name']);
+    $name = $body['name'] ?? $name;
 
     if (empty($email) || empty($password) || empty($name)) {
         jsonError('Nombre, correo y contraseña son requeridos');
@@ -166,6 +230,9 @@ function handleUpdate() {
 
     $pdo = getConnection();
 
+    // Force uppercase
+    forceUppercase($body, ['name']);
+
     $fields = [];
     $params = [];
 
@@ -176,6 +243,10 @@ function handleUpdate() {
     if (isset($body['associated_projects']) || isset($body['associatedProjects'])) {
         $fields[] = 'associated_projects = ?';
         $params[] = json_encode($body['associated_projects'] ?? $body['associatedProjects'] ?? []);
+    }
+    if (isset($body['signature_image']) || isset($body['signatureImage'])) {
+        $fields[] = 'signature_image = ?';
+        $params[] = $body['signature_image'] ?? $body['signatureImage'];
     }
     if (isset($body['password']) && !empty($body['password'])) {
         $fields[] = 'password = ?';

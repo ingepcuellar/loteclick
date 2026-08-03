@@ -31,5 +31,10 @@ export const disbursementService = {
 
     async delete(id) {
         return api.delete(`endpoints/disbursements.php?id=${id}`);
+    },
+
+    // Ítem 1: Socio receptor acepta la entrega
+    async accept(id) {
+        return api.put(`endpoints/disbursements.php?action=accept&id=${id}`, {});
     }
 };

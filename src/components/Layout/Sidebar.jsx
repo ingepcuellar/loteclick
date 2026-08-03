@@ -13,8 +13,10 @@ import {
     FiUserCheck,
     FiZap,
     FiBell,
-    FiSmartphone
+    FiAlertTriangle,
+    FiGitMerge
 } from 'react-icons/fi';
+import { FiUpload, FiShield } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { brand } from '../../config/brandConfig';
@@ -50,11 +52,37 @@ function Sidebar({ isOpen, onClose }) {
         return () => clearInterval(interval);
     }, [authState.currentUser]);
 
-    const navItems = [
+    // Ítem 21: Menú adaptado por rol — socios ven menú simplificado
+    const partnerNavItems = [
+        {
+            section: 'Mi Espacio',
+            items: [
+                { path: '/partner-dashboard', icon: FiHome, label: 'Mi Dashboard', module: 'dashboard' },
+                { path: '/projects', icon: FiFolder, label: 'Proyectos', module: 'projects' },
+                { path: '/sales', icon: FiShoppingCart, label: 'Ventas', module: 'sales' },
+                { path: '/payments', icon: FiCreditCard, label: 'Pagos', module: 'payments' },
+                { path: '/expenses', icon: FiDollarSign, label: 'Gastos', module: 'expenses' },
+                { path: '/disbursements', icon: FiDollarSign, label: 'Entregas', module: 'disbursements' },
+                { path: '/reports', icon: FiBarChart2, label: 'Reportes', module: 'reports' },
+            ]
+        },
+        {
+            section: 'Notificaciones',
+            items: [
+                {
+                    path: '/notifications', icon: FiBell, label: 'Notificaciones',
+                    badge: unreadCount, badgeStyle: unreadCount > 0 ? 'alert' : null,
+                    module: 'dashboard'
+                },
+            ]
+        },
+    ];
+
+    const fullNavItems = [
         {
             section: 'Principal',
             items: [
-                { path: isPartner() ? '/partner-dashboard' : '/', icon: FiHome, label: isPartner() ? 'Mi Dashboard' : 'Dashboard', module: 'dashboard' },
+                { path: '/', icon: FiHome, label: 'Dashboard', module: 'dashboard' },
             ]
         },
         {
@@ -62,15 +90,17 @@ function Sidebar({ isOpen, onClose }) {
             items: [
                 { path: '/projects', icon: FiFolder, label: 'Proyectos', badge: stats.totalProjects, module: 'projects' },
                 { path: '/clients', icon: FiUsers, label: 'Clientes', badge: stats.totalClients, module: 'clients' },
-                ...(isAdmin() ? [{ path: '/sales', icon: FiShoppingCart, label: 'Ventas', badge: stats.totalSales, module: 'sales' }] : []),
+                { path: '/sales', icon: FiShoppingCart, label: 'Ventas', badge: stats.totalSales, module: 'sales' },
                 { path: '/expenses', icon: FiDollarSign, label: 'Gastos', module: 'expenses' },
             ]
         },
         {
             section: 'Tesorería',
             items: [
-                { path: '/payments', icon: FiCreditCard, label: 'Pagos', module: 'payments' },
-                { path: '/disbursements', icon: FiDollarSign, label: 'Entregas a Socios', module: 'disbursements' },
+                { path: '/payments',           icon: FiCreditCard,    label: 'Pagos',             module: 'payments' },
+                { path: '/disbursements',       icon: FiDollarSign,    label: 'Entregas a Socios', module: 'disbursements' },
+                { path: '/desistimientos',      icon: FiAlertTriangle, label: 'Desistimientos',    module: 'desistimientos' },
+                { path: '/bank-reconciliation', icon: FiGitMerge,      label: 'Conciliación',      module: 'bank_reconciliation' },
             ]
         },
         {
@@ -83,12 +113,9 @@ function Sidebar({ isOpen, onClose }) {
             section: 'Notificaciones',
             items: [
                 {
-                    path: '/notifications',
-                    icon: FiBell,
-                    label: 'Notificaciones',
-                    badge: unreadCount,
-                    badgeStyle: unreadCount > 0 ? 'alert' : null,
-                    module: 'dashboard' // Partners and admins can access
+                    path: '/notifications', icon: FiBell, label: 'Notificaciones',
+                    badge: unreadCount, badgeStyle: unreadCount > 0 ? 'alert' : null,
+                    module: 'dashboard'
                 },
             ]
         },
@@ -106,13 +133,17 @@ function Sidebar({ isOpen, onClose }) {
         },
     ];
 
+    // Use partner menu for pure partner/secondary users
+    const navItems = (isPartner() && !isAdmin()) ? partnerNavItems : fullNavItems;
+
     // Add admin section if user is admin
     if (isAdmin()) {
         navItems.push({
             section: 'Administración',
             items: [
                 { path: '/users', icon: FiUserCheck, label: 'Usuarios', module: 'users' },
-                { path: '/push-diagnostic', icon: FiSmartphone, label: 'Push Diagnostic', module: 'users' },
+                { path: '/bulk-import', icon: FiUpload, label: 'Carga Masiva', module: 'users' },
+                { path: '/admin/audit', icon: FiShield, label: 'Auditoría', module: 'users' },
             ]
         });
     }

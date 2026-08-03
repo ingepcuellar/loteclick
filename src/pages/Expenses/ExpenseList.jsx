@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
     FiPlus,
@@ -11,9 +11,12 @@ import {
     FiFolder,
     FiCalendar,
     FiTag,
-    FiImage
+    FiImage,
+    FiCreditCard
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { expenseService } from '../../services/expenseService';
+import { bankAccountService } from '../../services/bankAccountService';
 import { formatCurrency, formatDate } from '../../lib/formatters';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
@@ -32,7 +35,14 @@ const EXPENSE_CATEGORIES = {
     marketing: { label: 'Marketing', color: '#ec4899' },
     administrative: { label: 'Administrativo', color: '#f59e0b' },
     infrastructure: { label: 'Infraestructura', color: '#3b82f6' },
+    desistimientos: { label: 'Desistimientos', color: '#ef4444' },
     other: { label: 'Otros', color: '#6b7280' }
+};
+
+const PAYMENT_METHODS = {
+    cash: 'Efectivo',
+    transfer: 'Transferencia',
+    barter: 'Permuta'
 };
 
 function ExpenseList() {
@@ -42,6 +52,13 @@ function ExpenseList() {
     const [filterCategory, setFilterCategory] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState(null);
+    const [bankAccounts, setBankAccounts] = useState([]);
+
+    useEffect(() => {
+        bankAccountService.getAll().then(({ data }) => {
+            if (data) setBankAccounts(data);
+        }).catch(console.error);
+    }, []);
 
     // Calculate totals
     const totals = useMemo(() => {
@@ -187,6 +204,7 @@ function ExpenseList() {
                                             <th>Proyecto</th>
                                             <th>Categoría</th>
                                             <th>Fecha</th>
+                                            <th>Método</th>
                                             <th>Adjunto</th>
                                             <th style={{ textAlign: 'right' }}>Monto</th>
                                             <th style={{ textAlign: 'center' }}>Acciones</th>
@@ -232,6 +250,17 @@ function ExpenseList() {
                                                             {formatDate(expense.date || expense.createdAt)}
                                                         </div>
                                                     </td>
+                                                    <td>
+                                                        <span className="badge" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
+                                                            <FiCreditCard style={{ marginRight: '4px' }} />
+                                                            {PAYMENT_METHODS[expense.paymentMethod || expense.payment_method] || 'Efectivo'}
+                                                        </span>
+                                                        {(expense.paymentMethod === 'transfer' || expense.payment_method === 'transfer') && (expense.bankAccountId || expense.bank_account_id) && (
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                                                {bankAccounts.find(b => b.id === (expense.bankAccountId || expense.bank_account_id))?.bank_name || 'Cuenta'}
+                                                            </div>
+                                                        )}
+                                                    </td>
                                                     <td style={{ textAlign: 'center' }}>
                                                         {expense.attachment ? (
                                                             <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
@@ -275,7 +304,7 @@ function ExpenseList() {
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <td colSpan="5" style={{ textAlign: 'right', fontWeight: 600 }}>
+                                            <td colSpan="6" style={{ textAlign: 'right', fontWeight: 600 }}>
                                                 Total:
                                             </td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, color: '#ef4444', fontSize: '1.1rem' }}>
@@ -319,6 +348,12 @@ function ExpenseList() {
                                                 <div className="mobile-card-row">
                                                     <span className="mobile-card-label">Fecha</span>
                                                     <span className="mobile-card-value">{formatDate(expense.date || expense.createdAt)}</span>
+                                                </div>
+                                                <div className="mobile-card-row">
+                                                    <span className="mobile-card-label">Método</span>
+                                                    <span className="mobile-card-value">
+                                                        {PAYMENT_METHODS[expense.paymentMethod || expense.payment_method] || 'Efectivo'}
+                                                    </span>
                                                 </div>
                                                 <div className="mobile-card-row">
                                                     <span className="mobile-card-label">Adjunto</span>

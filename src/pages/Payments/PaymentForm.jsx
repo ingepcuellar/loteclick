@@ -11,18 +11,23 @@ import {
     FiLoader,
     FiCheck,
     FiSearch,
-    FiCreditCard
+    FiCreditCard,
+    FiPlus
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
-import { formatCurrency, safeParseDate } from '../../lib/formatters';
+import { useAuth } from '../../context/AuthContext';
+import { formatCurrency, safeParseDate, todayBogota } from '../../lib/formatters';
 import { storageService } from '../../services/storageService';
+import { bankAccountService } from '../../services/bankAccountService';
 import { parseBarcodeInput, generatePaymentReceiptHTML, openPrintWindow, writeToPrintWindow } from '../../lib/barcodeUtils';
 import { pickImage } from '../../lib/cameraUtils';
+import CurrencyInput from '../../components/ui/CurrencyInput';
 
 function PaymentForm() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const preselectedSaleId = searchParams.get('saleId');
+    const { currentUser } = useAuth();
 
     const {
         state,
@@ -33,6 +38,7 @@ function PaymentForm() {
         getPendingAmount,
         getInstallmentsBySale,
         markInstallmentAsPaid,
+        markInstallmentAsPartial,
         autoRedistributeInstallments,
         refreshData
     } = useApp();
@@ -40,7 +46,7 @@ function PaymentForm() {
     const [formData, setFormData] = useState({
         saleId: preselectedSaleId || '',
         amount: '',
-        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDate: todayBogota(),
         paymentMethod: 'cash',
         receiptImage: '',
         notes: '',
@@ -51,14 +57,63 @@ function PaymentForm() {
     const [uploadingImage, setUploadingImage] = useState(false);
     const [pendingInstallments, setPendingInstallments] = useState([]);
     const [allInstallments, setAllInstallments] = useState([]);
-    const [selectedInstallmentId, setSelectedInstallmentId] = useState('');
+    const [selectedInstallmentIds, setSelectedInstallmentIds] = useState([]);
     const [loadingInstallments, setLoadingInstallments] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    // Bank Accounts
+    const [bankAccounts, setBankAccounts] = useState([]);
+    const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
+    const [showNewAccount, setShowNewAccount] = useState(false);
+    const [newAccountData, setNewAccountData] = useState({ bank_name: '', account_type: 'Ahorros', account_number: '', owner_name: '' });
+    const [creatingAccount, setCreatingAccount] = useState(false);
 
     // Barcode scanning
     const [barcodeInput, setBarcodeInput] = useState('');
     const [barcodeError, setBarcodeError] = useState('');
     const barcodeInputRef = useRef(null);
+
+    // Load bank accounts
+    useEffect(() => {
+        const loadBankAccounts = async () => {
+            try {
+                const { data } = await bankAccountService.getAll();
+                if (data) {
+                    // Ítem 4c: Solo mostrar la cuenta terminada en 8977
+                    const filtered = data.filter(b => String(b.account_number).endsWith('8977'));
+                    setBankAccounts(filtered.length > 0 ? filtered : data);
+                    // Auto-seleccionar si hay una sola cuenta
+                    if (filtered.length === 1 && !selectedBankAccountId) {
+                        setSelectedBankAccountId(filtered[0].id);
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading bank accounts:', err);
+            }
+        };
+        loadBankAccounts();
+    }, []);
+
+    const handleCreateBankAccount = async () => {
+        if (!newAccountData.bank_name || !newAccountData.account_number) return;
+        setCreatingAccount(true);
+        try {
+            const { data, error } = await bankAccountService.create(newAccountData);
+            if (!error) {
+                const newAccountList = await bankAccountService.getAll();
+                if (newAccountList.data) setBankAccounts(newAccountList.data);
+                setSelectedBankAccountId(data?.id || '');
+                setShowNewAccount(false);
+                setNewAccountData({ bank_name: '', account_type: 'Ahorros', account_number: '', owner_name: '' });
+            } else {
+                alert('Error al crear la cuenta bancaria.');
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setCreatingAccount(false);
+        }
+    };
 
 
 
@@ -129,22 +184,32 @@ function PaymentForm() {
                 setPendingInstallments([]);
                 setAllInstallments([]);
             }
-            setSelectedInstallmentId('');
+            setSelectedInstallmentIds([]);
         };
         loadInstallments();
     }, [formData.saleId, isInstallmentSale]);
 
-    // Update amount when installment is selected
+    // Update amount when installment is selected — usa saldo pendiente (amount - paid)
     const handleInstallmentChange = (installmentId) => {
-        setSelectedInstallmentId(installmentId);
-        if (installmentId) {
-            const inst = pendingInstallments.find(i => i.id === installmentId);
-            if (inst) {
-                setFormData(prev => ({ ...prev, amount: inst.amount.toString() }));
+        setSelectedInstallmentIds(prev => {
+            let next;
+            if (prev.includes(installmentId)) {
+                next = prev.filter(id => id !== installmentId);
+            } else {
+                next = [...prev, installmentId];
             }
-        } else {
-            setFormData(prev => ({ ...prev, amount: '' }));
-        }
+            
+            const total = next.reduce((sum, id) => {
+                const inst = pendingInstallments.find(i => i.id === id);
+                if (!inst) return sum;
+                // Usar saldo pendiente (restando lo ya pagado en pagos parciales)
+                const remaining = parseFloat(inst.amount) - parseFloat(inst.paidAmount || inst.paid_amount || 0);
+                return sum + Math.max(0, remaining);
+            }, 0);
+            
+            setFormData(fd => ({ ...fd, amount: total > 0 ? total.toString() : '' }));
+            return next;
+        });
     };
 
     const validate = () => {
@@ -156,6 +221,9 @@ function PaymentForm() {
         }
         if (parseFloat(formData.amount) > pendingAmount) {
             newErrors.amount = `El monto no puede ser mayor al pendiente (${formatCurrency(pendingAmount)})`;
+        }
+        if (formData.paymentMethod === 'transfer' && !selectedBankAccountId) {
+            newErrors.bankAccount = 'Selecciona una cuenta bancaria';
         }
 
         setErrors(newErrors);
@@ -220,6 +288,7 @@ function PaymentForm() {
                 amount: paymentAmount,
                 paymentDate: formData.paymentDate,
                 paymentMethod: formData.paymentMethod || 'cash',
+                bankAccountId: formData.paymentMethod === 'transfer' ? selectedBankAccountId : null,
                 receiptImage: formData.receiptImage,
                 notes: formData.notes,
             };
@@ -228,30 +297,41 @@ function PaymentForm() {
 
             // 2. Handle installment logic
             if (isInstallmentSale && pendingInstallments.length > 0 && payment && payment.id) {
-                // Use the selected installment (from grid click), or fallback to first pending
-                const targetInstallment = selectedInstallmentId
-                    ? pendingInstallments.find(i => i.id === selectedInstallmentId)
-                    : pendingInstallments[0];
-                const targetAmount = parseFloat(targetInstallment?.amount || 0);
+                if (selectedInstallmentIds.length === 1) {
+                    // Cuota única seleccionada: evaluar si es pago completo o parcial
+                    const selectedInst = pendingInstallments.find(i => i.id === selectedInstallmentIds[0]);
+                    const instBalance = selectedInst
+                        ? parseFloat(selectedInst.amount) - parseFloat(selectedInst.paidAmount || selectedInst.paid_amount || 0)
+                        : 0;
 
-                if (selectedInstallmentId && Math.abs(paymentAmount - targetAmount) < 0.01) {
-                    // Exact payment for selected installment — just mark as paid
-                    try {
-                        await markInstallmentAsPaid(selectedInstallmentId, payment.id);
-                    } catch (err) {
-                        console.error('Error marking installment as paid:', err);
+                    if (Math.abs(paymentAmount - instBalance) < 0.01 || paymentAmount >= instBalance) {
+                        // Pago completo → marcar como pagada
+                        await markInstallmentAsPaid(selectedInstallmentIds[0], payment.id);
+                    } else {
+                        // Pago parcial (Opção A) → marcar como 'partial' con saldo visible
+                        await markInstallmentAsPartial(selectedInstallmentIds[0], paymentAmount + parseFloat(selectedInst?.paidAmount || 0));
+                    }
+                } else if (selectedInstallmentIds.length > 1) {
+                    // Múltiples cuotas: si la suma exacta, marca todas como pagadas
+                    const totalSelectedAmount = selectedInstallmentIds.reduce((sum, id) => {
+                        const inst = pendingInstallments.find(i => i.id === id);
+                        return sum + (inst ? parseFloat(inst.amount) - parseFloat(inst.paidAmount || 0) : 0);
+                    }, 0);
+
+                    if (Math.abs(paymentAmount - totalSelectedAmount) < 0.01) {
+                        for (const id of selectedInstallmentIds) {
+                            try {
+                                await markInstallmentAsPaid(id, payment.id);
+                            } catch (err) {
+                                console.error('Error marking installment as paid:', err);
+                            }
+                        }
+                    } else {
+                        await autoRedistributeInstallments(formData.saleId, paymentAmount, payment.id);
                     }
                 } else {
-                    // Amount differs or no specific installment — auto redistribute
-                    try {
-                        await autoRedistributeInstallments(
-                            formData.saleId,
-                            paymentAmount,
-                            payment.id
-                        );
-                    } catch (err) {
-                        console.error('Error auto-redistributing installments:', err);
-                    }
+                    // Sin cuota seleccionada: redistribuir automáticamente
+                    await autoRedistributeInstallments(formData.saleId, paymentAmount, payment.id);
                 }
             }
 
@@ -272,7 +352,10 @@ function PaymentForm() {
                     },
                     sale: { ...selectedSale, totalPaid },
                     client,
-                    project
+                    project,
+                    currentUser,
+                    selectedInstallmentIds,
+                    installments: allInstallments
                 });
                 writeToPrintWindow(receiptWindow, receiptHtml);
             } catch (err) {
@@ -319,7 +402,7 @@ function PaymentForm() {
             </div>
 
             {/* Barcode Scanner Section */}
-            {!preselectedSaleId && (
+            {!preselectedSaleId && import.meta.env.VITE_BRAND !== 'diamante' && (
                 <div className="card mb-6" style={{ borderLeft: '4px solid var(--color-primary-500)' }}>
                     <div className="card-body">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-3)', marginBottom: 'var(--spacing-3)' }}>
@@ -431,7 +514,7 @@ function PaymentForm() {
                                                     const isPaid = installment.status === 'paid';
                                                     const isPartial = installment.status === 'partial';
                                                     const isOverdue = !isPaid && safeParseDate(installment.dueDate) < new Date();
-                                                    const isSelected = selectedInstallmentId === installment.id;
+                                                    const isSelected = selectedInstallmentIds.includes(installment.id);
                                                     const isSelectable = !isPaid;
 
                                                     // Label based on installment number
@@ -552,7 +635,7 @@ function PaymentForm() {
                                             </div>
 
                                             {/* Selected installment details */}
-                                            {selectedInstallmentId && (
+                                            {selectedInstallmentIds.length > 0 && (
                                                 <div style={{
                                                     marginTop: 'var(--spacing-3)',
                                                     padding: 'var(--spacing-3)',
@@ -560,7 +643,7 @@ function PaymentForm() {
                                                     borderRadius: 'var(--radius-md)',
                                                     border: '1px solid var(--color-primary-500)40'
                                                 }}>
-                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Monto de la cuota: </span>
+                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Monto total seleccionado ({selectedInstallmentIds.length} cuotas): </span>
                                                     <span style={{ fontWeight: '600', color: 'var(--color-primary-500)' }}>
                                                         {formatCurrency(parseFloat(formData.amount || 0))}
                                                     </span>
@@ -589,13 +672,31 @@ function PaymentForm() {
                             <div className="form-row">
                                 <div className="form-group">
                                     <label className="form-label required">Monto del Pago</label>
-                                    <input
-                                        type="number"
+                                    <CurrencyInput
                                         className={`form-input ${errors.amount ? 'error' : ''}`}
                                         placeholder="1000000"
                                         value={formData.amount}
                                         onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
-                                    />
+                                    />{/* Indicator: pago parcial vs. pago total */}
+                                    {selectedInstallmentIds.length === 1 && formData.amount && (() => {
+                                        const selInst = pendingInstallments.find(i => i.id === selectedInstallmentIds[0]);
+                                        if (!selInst) return null;
+                                        const balance = parseFloat(selInst.amount) - parseFloat(selInst.paidAmount || 0);
+                                        const paid = parseFloat(formData.amount || 0);
+                                        const isPartial = paid > 0 && paid < balance - 0.01;
+                                        const isFull = Math.abs(paid - balance) < 0.01 || paid >= balance;
+                                        if (isPartial) return (
+                                            <div style={{ marginTop: '6px', padding: '6px 10px', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-xs)', color: '#b45309' }}>
+                                                🟡 <strong>Pago Parcial</strong> — Saldo restante en cuota: {formatCurrency(balance - paid)}
+                                            </div>
+                                        );
+                                        if (isFull) return (
+                                            <div style={{ marginTop: '6px', padding: '6px 10px', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-xs)', color: '#059669' }}>
+                                                ✅ <strong>Pago Completo</strong> — Cuota quedará como pagada
+                                            </div>
+                                        );
+                                        return null;
+                                    })()}
                                     {errors.amount && <span className="form-error">{errors.amount}</span>}
                                     {pendingAmount > 0 && (
                                         <button
@@ -666,10 +767,74 @@ function PaymentForm() {
                                     >
                                         <span style={{ fontSize: '1.2rem' }}>🏦</span> Transferencia
                                     </button>
+                                    <button
+                                        type="button"
+                                        className={`btn ${formData.paymentMethod === 'permuta' ? 'btn-primary' : 'btn-secondary'}`}
+                                        onClick={() => setFormData(prev => ({ ...prev, paymentMethod: 'permuta' }))}
+                                        style={{
+                                            flex: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            padding: 'var(--spacing-3) var(--spacing-4)',
+                                            border: formData.paymentMethod === 'permuta'
+                                                ? '2px solid var(--color-primary-500)'
+                                                : '2px solid var(--border-color)',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <span style={{ fontSize: '1.2rem' }}>🔄</span> Permuta
+                                    </button>
                                 </div>
                             </div>
 
-                            <div className="form-group">
+                            {formData.paymentMethod === 'transfer' && (
+                                <div className="form-group" style={{ marginTop: 'var(--spacing-3)', background: 'var(--bg-tertiary)', padding: 'var(--spacing-3)', borderRadius: 'var(--radius-md)' }}>
+                                    <div className="flex-between mb-2">
+                                        <label className="form-label required m-0">Cuenta Bancaria Destino</label>
+                                    </div>
+                                    
+                                    {showNewAccount ? (
+                                        <div style={{ background: 'var(--bg-primary)', padding: 'var(--spacing-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: 'var(--spacing-3)' }}>
+                                            <h4 style={{ margin: '0 0 var(--spacing-3) 0', fontSize: 'var(--font-size-sm)' }}>Crear Cuenta Bancaria</h4>
+                                            <div className="grid grid-2" style={{ gap: 'var(--spacing-2)' }}>
+                                                <input type="text" className="form-input" placeholder="Banco (ej. Bancolombia)" value={newAccountData.bank_name} onChange={e => setNewAccountData(p => ({...p, bank_name: e.target.value}))} />
+                                                <select className="form-select" value={newAccountData.account_type} onChange={e => setNewAccountData(p => ({...p, account_type: e.target.value}))}>
+                                                    <option value="Ahorros">Ahorros</option>
+                                                    <option value="Corriente">Corriente</option>
+                                                </select>
+                                                <input type="text" className="form-input" placeholder="Número de cuenta" value={newAccountData.account_number} onChange={e => setNewAccountData(p => ({...p, account_number: e.target.value}))} />
+                                                <input type="text" className="form-input" placeholder="Titular (opcional)" value={newAccountData.owner_name} onChange={e => setNewAccountData(p => ({...p, owner_name: e.target.value}))} />
+                                            </div>
+                                            <div className="flex justify-end mt-3 gap-2">
+                                                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNewAccount(false)}>Cancelar</button>
+                                                <button type="button" className="btn btn-primary btn-sm" onClick={handleCreateBankAccount} disabled={creatingAccount || !newAccountData.bank_name || !newAccountData.account_number}>
+                                                    {creatingAccount ? 'Guardando...' : 'Guardar Cuenta'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <select 
+                                                className={`form-select ${errors.bankAccount ? 'error' : ''}`}
+                                                value={selectedBankAccountId}
+                                                onChange={(e) => setSelectedBankAccountId(e.target.value)}
+                                            >
+                                                <option value="">Selecciona una cuenta</option>
+                                                {bankAccounts.map(b => (
+                                                    <option key={b.id} value={b.id}>
+                                                        {b.bank_name} - {b.account_type} {b.account_number} {b.owner_name ? `(${b.owner_name})` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {errors.bankAccount && <span className="form-error">{errors.bankAccount}</span>}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="form-group" style={{ marginTop: 'var(--spacing-3)' }}>
                                 <label className="form-label">Notas</label>
                                 <textarea
                                     className="form-textarea"

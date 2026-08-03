@@ -8,14 +8,15 @@ export const installmentService = {
         return api.get(`endpoints/installments.php?action=bySale&saleId=${saleId}`);
     },
 
-    async generateInstallments(saleId, totalAmount, numInstallments, startDate, downPayment = 0, separeAmount = 0) {
+    async generateInstallments(saleId, totalAmount, numInstallments, startDate, downPayment = 0, separeAmount = 0, customPlan = null) {
         return api.post('endpoints/installments.php?action=generate', {
             saleId,
             totalAmount,
             numInstallments,
             startDate,
             downPayment,
-            separeAmount
+            separeAmount,
+            customPlan
         });
     },
 

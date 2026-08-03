@@ -1,7 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { useOffline } from './context/OfflineContext';
 import { useEffect } from 'react';
 import Layout from './components/Layout/Layout';
+import OfflineIndicator from './components/ui/OfflineIndicator';
 import PushNotificationService from './services/PushNotificationService';
 import { brand } from './config/brandConfig';
 
@@ -33,9 +35,13 @@ import DisbursementForm from './pages/Treasury/DisbursementForm';
 import UtilityList from './pages/Utilities/UtilityList';
 import UtilityForm from './pages/Utilities/UtilityForm';
 import NotificationList from './pages/Notifications/NotificationList';
-import PushDiagnostic from './pages/PushDiagnostic';
 import Profile from './pages/Profile/Profile';
 import ContractParams from './pages/Settings/ContractParams';
+import BulkImport from './pages/BulkImport/BulkImport';
+import DesistimientoList from './pages/Desistimientos/DesistimientoList';
+import AuditLog from './pages/Admin/AuditLog';
+import OfflineDiagnostic from './pages/Admin/OfflineDiagnostic';
+import BankReconciliation from './pages/BankReconciliation/BankReconciliation';
 
 // Protected Route Component
 function ProtectedRoute({ children, requiredRole }) {
@@ -63,7 +69,8 @@ function ProtectedRoute({ children, requiredRole }) {
 }
 
 function App() {
-    const { isAuthenticated, isLoading, isSeller, isTreasurer, isPartner, currentUser } = useAuth();
+    const { isAuthenticated, isLoading, isAdmin, isSeller, isTreasurer, isPartner, currentUser } = useAuth();
+    const { pendingCount, isSyncing, forceSync } = useOffline();
 
     // Initialize push notifications when user is logged in
     useEffect(() => {
@@ -87,8 +94,9 @@ function App() {
         );
     }
 
-    // Determine default route based on role
+    // Determine default route based on role (admin takes priority over all others)
     const getDefaultRoute = () => {
+        if (isAdmin()) return <Dashboard />;
         if (isSeller()) return <Navigate to="/projects" replace />;
         if (isTreasurer()) return <Navigate to="/payments" replace />;
         if (isPartner()) return <PartnerDashboard />;
@@ -96,6 +104,7 @@ function App() {
     };
 
     return (
+        <>
         <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
@@ -142,6 +151,12 @@ function App() {
                                 <Route path="/disbursements" element={<DisbursementList />} />
                                 <Route path="/disbursements/new" element={<DisbursementForm />} />
 
+                                {/* Desistimientos */}
+                                <Route path="/desistimientos" element={<DesistimientoList />} />
+
+                                {/* Conciliación Bancaria (Ítem 4b) */}
+                                <Route path="/bank-reconciliation" element={<BankReconciliation />} />
+
                                 {/* Utility Registrations (Servicios Públicos) */}
                                 <Route path="/utilities" element={<UtilityList />} />
                                 <Route path="/utilities/new" element={<UtilityForm />} />
@@ -158,14 +173,21 @@ function App() {
                                 {/* Notifications */}
                                 <Route path="/notifications" element={<NotificationList />} />
 
-                                {/* Push Diagnostic (temporary) */}
-                                <Route path="/push-diagnostic" element={<PushDiagnostic />} />
 
                                 {/* Profile */}
                                 <Route path="/profile" element={<Profile />} />
 
                                 {/* Contract Params (Admin) */}
                                 <Route path="/contract-params" element={<ContractParams />} />
+
+                                {/* Bulk Import (Admin) */}
+                                <Route path="/bulk-import" element={<BulkImport />} />
+
+                                {/* Audit Log (Admin only) */}
+                                <Route path="/admin/audit" element={<ProtectedRoute requiredRole="admin"><AuditLog /></ProtectedRoute>} />
+
+                                {/* Offline Diagnostic (Admin only) */}
+                                <Route path="/admin/offline" element={<ProtectedRoute requiredRole="admin"><OfflineDiagnostic /></ProtectedRoute>} />
 
                                 {/* Fallback */}
                                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -175,6 +197,21 @@ function App() {
                 }
             />
         </Routes>
+        <OfflineIndicator
+            pendingCount={pendingCount}
+            isSyncing={isSyncing}
+            onForceSync={forceSync}
+        />
+        <style>{`
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+            .spin-animation {
+                animation: spin 1s linear infinite;
+            }
+        `}</style>
+        </>
     );
 }
 

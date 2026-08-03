@@ -18,6 +18,11 @@ function ContractParams() {
         vendorDocument: '',
         vendorPhone: '',
         vendorAddress: '',
+        vendorCiudadCC: '',
+        vendorEmail: '',
+        empresaNombre: '',
+        empresaNit: '',
+        numeroCuenta: '',
         matriculaInmobiliaria: '',
         porcentajeCuota: '0.052%',
         ciudad: 'Villavicencio - Meta',
@@ -26,7 +31,8 @@ function ContractParams() {
         escrituraFecha: '',
         escrituraHora: '03:00 PM',
         tituloPropiedad: '',
-        ultimoNumeroPromesa: 0
+        ultimoNumeroPromesa: 0,
+        initialPaymentPct: 20
     });
 
     const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +56,11 @@ function ContractParams() {
                     vendorDocument: p.vendor_document || '',
                     vendorPhone: p.vendor_phone || '',
                     vendorAddress: p.vendor_address || '',
+                    vendorCiudadCC: p.vendor_ciudad_cc || '',
+                    vendorEmail: p.vendor_email || '',
+                    empresaNombre: p.empresa_nombre || '',
+                    empresaNit: p.empresa_nit || '',
+                    numeroCuenta: p.numero_cuenta || '',
                     matriculaInmobiliaria: p.matricula_inmobiliaria || '',
                     porcentajeCuota: p.porcentaje_cuota || '0.052%',
                     ciudad: p.ciudad || 'Villavicencio - Meta',
@@ -58,7 +69,8 @@ function ContractParams() {
                     escrituraFecha: p.escritura_fecha || '',
                     escrituraHora: p.escritura_hora || '03:00 PM',
                     tituloPropiedad: p.titulo_propiedad || '',
-                    ultimoNumeroPromesa: parseInt(p.ultimo_numero_promesa) || 0
+                    ultimoNumeroPromesa: parseInt(p.ultimo_numero_promesa) || 0,
+                    initialPaymentPct: parseFloat(p.initial_payment_pct) || 20
                 });
                 setHasExistingRecord(!!p.id);
             }
@@ -154,7 +166,7 @@ function ContractParams() {
                                     name="vendorName"
                                     value={form.vendorName}
                                     onChange={handleChange}
-                                    placeholder="Ej: JULIO ENRIQUE RICARDO BENAVIDES"
+                                    placeholder="Ej: NOMBRE COMPLETO DEL VENDEDOR"
                                     required
                                 />
                             </div>
@@ -166,8 +178,19 @@ function ContractParams() {
                                     name="vendorDocument"
                                     value={form.vendorDocument}
                                     onChange={handleChange}
-                                    placeholder="Ej: 1.122.139.457"
+                                    placeholder="Ej: 1.000.000.000"
                                     required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Ciudad expedición C.C.</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    name="vendorCiudadCC"
+                                    value={form.vendorCiudadCC}
+                                    onChange={handleChange}
+                                    placeholder="Ej: Villavicencio"
                                 />
                             </div>
                             <div className="form-group">
@@ -178,7 +201,7 @@ function ContractParams() {
                                     name="vendorPhone"
                                     value={form.vendorPhone}
                                     onChange={handleChange}
-                                    placeholder="Ej: 3138546147"
+                                    placeholder="Ej: 3100000000"
                                 />
                             </div>
                             <div className="form-group">
@@ -189,8 +212,99 @@ function ContractParams() {
                                     name="vendorAddress"
                                     value={form.vendorAddress}
                                     onChange={handleChange}
-                                    placeholder="Ej: Centro comercial La Hacienda Local 209"
+                                    placeholder="Ej: Calle 10 # 20-30, Ciudad"
                                 />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Correo electrónico</label>
+                                <input
+                                    type="email"
+                                    className="form-input"
+                                    name="vendorEmail"
+                                    value={form.vendorEmail}
+                                    onChange={handleChange}
+                                    placeholder="Ej: vendedor@empresa.com"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Empresa */}
+                        <hr style={{ margin: 'var(--spacing-4) 0', borderColor: 'var(--border-color)' }} />
+                        <p style={{ color: 'var(--text-muted)', marginBottom: 'var(--spacing-4)', fontSize: 'var(--font-size-sm)', fontWeight: '600' }}>
+                            🏢 Empresa representada (aparece en los documentos Word)
+                        </p>
+                        <div className="grid grid-2">
+                            <div className="form-group">
+                                <label className="form-label">Nombre de la Empresa</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    name="empresaNombre"
+                                    value={form.empresaNombre}
+                                    onChange={handleChange}
+                                    placeholder="Ej: MI EMPRESA INMOBILIARIA S.A.S"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">NIT de la Empresa</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    name="empresaNit"
+                                    value={form.empresaNit}
+                                    onChange={handleChange}
+                                    placeholder="Ej: 900123456-7"
+                                />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <label className="form-label">N° Cuenta Bancaria (para transferencias)</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    name="numeroCuenta"
+                                    value={form.numeroCuenta}
+                                    onChange={handleChange}
+                                    placeholder="Ej: 38800007636 (Bancolombia Ahorros)"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Ventas */}
+                <div className="card mb-4">
+                    <div className="card-header">
+                        <h3 className="card-title">
+                            <FiHash className="card-title-icon" />
+                            Parámetros de Ventas
+                        </h3>
+                    </div>
+                    <div className="card-body">
+                        <p style={{ color: 'var(--text-muted)', marginBottom: 'var(--spacing-4)', fontSize: 'var(--font-size-sm)' }}>
+                            Estos valores se usan como valores predeterminados al registrar una nueva venta.
+                        </p>
+                        <div className="grid grid-2">
+                            <div className="form-group">
+                                <label className="form-label">% Cuota Inicial Predeterminada</label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-3)' }}>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        name="initialPaymentPct"
+                                        value={form.initialPaymentPct}
+                                        onChange={handleChange}
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        placeholder="20"
+                                        style={{ maxWidth: '120px' }}
+                                    />
+                                    <span style={{ color: 'var(--text-muted)', fontWeight: '600', fontSize: '1.2rem' }}>%</span>
+                                </div>
+                                <span className="form-hint">
+                                    Al registrar una venta a crédito, la cuota inicial se calculará automáticamente como este porcentaje del precio del lote.
+                                    El vendedor puede modificarla manualmente. Valor recomendado: 20%
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -261,7 +375,7 @@ function ContractParams() {
                                     name="notariaNombre"
                                     value={form.notariaNombre}
                                     onChange={handleChange}
-                                    placeholder="Ej: Notaría Cuarta del Círculo de Villavicencio"
+                                    placeholder="Ej: Notaría Primera del Círculo de la Ciudad"
                                 />
                             </div>
                             <div className="form-group">
@@ -319,7 +433,7 @@ function ContractParams() {
                                 value={form.tituloPropiedad}
                                 onChange={handleChange}
                                 rows={5}
-                                placeholder="Ej: Por compraventa que le hiciera el señor DAVID SANTIAGO BONILLA FORERO, identificado con CC. 1.122.134.440 de Acacias, mediante documento de compraventa otorgado el día 03 de junio de 2025..."
+                                placeholder="Ej: Por compraventa que le hiciera el señor NOMBRE VENDEDOR ANTERIOR, identificado con CC. X.XXX.XXX.XXX de Ciudad, mediante documento de compraventa otorgado el día DD de mes de AAAA..."
                                 style={{ resize: 'vertical', minHeight: '100px' }}
                             />
                         </div>

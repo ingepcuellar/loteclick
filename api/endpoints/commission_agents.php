@@ -33,8 +33,24 @@ switch ($method) {
 
 function getAllAgents() {
     $pdo = getConnection();
-    $stmt = $pdo->query("SELECT * FROM commission_agents ORDER BY name ASC");
-    jsonResponse(['data' => $stmt->fetchAll()]);
+    // Auto-create table if it doesn't exist
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS commission_agents (
+            id VARCHAR(36) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(50) DEFAULT NULL,
+            document VARCHAR(100) DEFAULT NULL,
+            notes TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )");
+    } catch (Exception $e) {}
+    try {
+        $stmt = $pdo->query("SELECT * FROM commission_agents ORDER BY name ASC");
+        jsonResponse(['data' => $stmt->fetchAll()]);
+    } catch (Exception $e) {
+        jsonResponse(['data' => []]);
+    }
 }
 
 function getAgent($id) {
@@ -50,6 +66,9 @@ function createAgent() {
     $pdo = getConnection();
     $body = getJsonBody();
     $id = generateUUID();
+
+    // Force uppercase
+    forceUppercase($body, ['name', 'notes']);
 
     $name = trim($body['name'] ?? '');
     if (empty($name)) jsonError('El nombre es requerido');
@@ -80,6 +99,9 @@ function createAgent() {
 function updateAgent($id) {
     $pdo = getConnection();
     $body = getJsonBody();
+
+    // Force uppercase
+    forceUppercase($body, ['name', 'notes']);
 
     $fields = [];
     $params = [];

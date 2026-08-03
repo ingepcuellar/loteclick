@@ -21,11 +21,12 @@ function checkOverdueInstallments() {
     
     // Find overdue installments (pending, due_date < today)
     $stmt = $pdo->prepare("
-        SELECT i.*, s.project_id, s.client_id, s.lot_number,
+        SELECT i.*, s.project_id, s.client_id, l.number as lot_number,
                c.name as client_name,
                p.name as project_name
         FROM installments i
         JOIN sales s ON i.sale_id = s.id
+        LEFT JOIN lots l ON s.lot_id = l.id
         LEFT JOIN clients c ON s.client_id = c.id
         LEFT JOIN projects p ON s.project_id = p.id
         WHERE i.status = 'pending' 

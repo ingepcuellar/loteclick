@@ -55,6 +55,10 @@ function getClient($id) {
 function createClient() {
     $pdo = getConnection();
     $body = getJsonBody();
+    
+    // Force uppercase for relevant fields
+    forceUppercase($body, ['name', 'fullName', 'address', 'notes']);
+    
     $id = generateUUID();
 
     $stmt = $pdo->prepare(
@@ -72,12 +76,27 @@ function createClient() {
 
     $stmt = $pdo->prepare("SELECT * FROM clients WHERE id = ?");
     $stmt->execute([$id]);
-    jsonResponse(['data' => $stmt->fetch()], 201);
+    $client = $stmt->fetch();
+
+    global $auth;
+    $userName = $auth['name'] ?? $auth['email'] ?? 'Sistema';
+    logAudit($auth['sub'] ?? '', $userName, 'create', 'client', $id, null, null,
+        $body['name'] ?? $body['fullName'] ?? '', 'Cliente creado');
+
+    jsonResponse(['data' => $client], 201);
 }
 
 function updateClient($id) {
     $pdo = getConnection();
     $body = getJsonBody();
+
+    // Force uppercase for relevant fields
+    forceUppercase($body, ['name', 'fullName', 'address', 'notes']);
+
+    // Get old data for audit
+    $oldStmt = $pdo->prepare("SELECT * FROM clients WHERE id = ?");
+    $oldStmt->execute([$id]);
+    $oldData = $oldStmt->fetch();
 
     $stmt = $pdo->prepare(
         "UPDATE clients SET name = ?, document = ?, phone = ?, email = ?, address = ?, notes = ? WHERE id = ?"
@@ -92,13 +111,40 @@ function updateClient($id) {
         $id
     ]);
 
+    // Audit log
+    global $auth;
+    $userName = 'Unknown';
+    if (isset($auth['sub'])) {
+        $uStmt = $pdo->prepare("SELECT name FROM profiles WHERE id = ?");
+        $uStmt->execute([$auth['sub']]);
+        $uRow = $uStmt->fetch();
+        if ($uRow) $userName = $uRow['name'];
+    }
+    $trackFields = ['name', 'document', 'phone', 'email', 'address'];
+    if ($oldData) {
+        foreach ($trackFields as $f) {
+            $oldVal = $oldData[$f] ?? '';
+            $newVal = $body[$f] ?? $oldVal;
+            if ((string)$oldVal !== (string)$newVal) {
+                logAudit($auth['sub'] ?? '', $userName, 'update', 'client', $id, $f, (string)$oldVal, (string)$newVal);
+            }
+        }
+    }
+
     $stmt = $pdo->prepare("SELECT * FROM clients WHERE id = ?");
     $stmt->execute([$id]);
     jsonResponse(['data' => $stmt->fetch()]);
 }
 
 function deleteClient($id) {
+    global $auth;
     $pdo = getConnection();
+    // Fetch name before deletion for audit
+    $stmtName = $pdo->prepare("SELECT name FROM clients WHERE id = ?");
+    $stmtName->execute([$id]);
+    $clientName = $stmtName->fetchColumn() ?? $id;
+    $userName = $auth['name'] ?? $auth['email'] ?? 'Sistema';
+    logAudit($auth['sub'] ?? '', $userName, 'delete', 'client', $id, null, $clientName, null, 'Cliente eliminado');
     $pdo->prepare("DELETE FROM clients WHERE id = ?")->execute([$id]);
     jsonResponse(['data' => ['id' => $id, 'deleted' => true]]);
 }

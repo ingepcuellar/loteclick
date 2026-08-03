@@ -13,11 +13,13 @@ import {
     FiImage,
     FiGrid,
     FiDownload,
-    FiAlertCircle
+    FiAlertCircle,
+    FiCreditCard
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { formatCurrency, formatDateLong as formatDate } from '../../lib/formatters';
+import { bankAccountService } from '../../services/bankAccountService';
 
 const EXPENSE_CATEGORIES = {
     commissions: { label: 'Comisiones', color: '#f97316' },
@@ -33,7 +35,14 @@ const EXPENSE_CATEGORIES = {
     marketing: { label: 'Marketing', color: '#ec4899' },
     administrative: { label: 'Administrativo', color: '#f59e0b' },
     infrastructure: { label: 'Infraestructura', color: '#3b82f6' },
+    desistimientos: { label: 'Desistimientos', color: '#ef4444' },
     other: { label: 'Otros', color: '#6b7280' }
+};
+
+const PAYMENT_METHODS = {
+    cash: 'Efectivo',
+    transfer: 'Transferencia',
+    barter: 'Permuta'
 };
 
 function ExpenseDetail() {
@@ -42,8 +51,15 @@ function ExpenseDetail() {
     const { getExpenseById, getProjectById, deleteExpense, state } = useApp();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+    const [bankAccounts, setBankAccounts] = useState([]);
 
     const expense = getExpenseById(id);
+
+    useEffect(() => {
+        bankAccountService.getAll().then(({ data }) => {
+            if (data) setBankAccounts(data);
+        }).catch(console.error);
+    }, []);
 
     if (!expense) {
         return (
@@ -173,6 +189,31 @@ function ExpenseDetail() {
                             </div>
                             <div className="info-value" style={{ textTransform: 'capitalize' }}>
                                 {formatDate(expense.date || expense.createdAt)}
+                            </div>
+                        </div>
+
+                        {/* Payment Method */}
+                        <div className="info-item">
+                            <div className="info-label">
+                                <FiCreditCard style={{ marginRight: '0.5rem', color: '#f59e0b' }} />
+                                Método de Pago
+                            </div>
+                            <div className="info-value">
+                                <span
+                                    className="badge"
+                                    style={{
+                                        background: 'var(--bg-secondary)',
+                                        color: 'var(--text-primary)',
+                                        border: '1px solid var(--border-color)'
+                                    }}
+                                >
+                                    {PAYMENT_METHODS[expense.paymentMethod || expense.payment_method] || 'Efectivo'}
+                                </span>
+                                {(expense.paymentMethod === 'transfer' || expense.payment_method === 'transfer') && (expense.bankAccountId || expense.bank_account_id) && (
+                                    <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                        Cuenta: {bankAccounts.find(b => b.id === (expense.bankAccountId || expense.bank_account_id))?.bank_name || 'Desconocida'} - {bankAccounts.find(b => b.id === (expense.bankAccountId || expense.bank_account_id))?.account_number}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

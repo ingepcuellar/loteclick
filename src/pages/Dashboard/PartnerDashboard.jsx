@@ -39,13 +39,24 @@ function PartnerDashboard() {
     }, [currentUser?.id]);
 
     // Filter projects for this partner
+    // Mecanismo 1: associated_projects en el perfil del usuario
+    // Mecanismo 2 (fallback): el proyecto lista al socio en su array partners (por id o nombre)
     const associatedProjectIds = getAssociatedProjects();
+    const partnerName = currentUser?.name || '';
     const myProjects = useMemo(() => {
-        return state.projects.filter(p =>
-            associatedProjectIds.includes(p.id) ||
-            associatedProjectIds.includes(String(p.id))
-        );
-    }, [state.projects, associatedProjectIds]);
+        return state.projects.filter(p => {
+            // Mecanismo 1: ID explícitamente asociado al perfil
+            if (associatedProjectIds.includes(p.id) || associatedProjectIds.includes(String(p.id))) {
+                return true;
+            }
+            // Mecanismo 2 fallback: el proyecto tiene a este socio en su lista de partners
+            const partners = p.partners || [];
+            return partners.some(partner =>
+                String(partner.id) === String(currentUser?.id) ||
+                (partnerName && partner.name?.toLowerCase() === partnerName.toLowerCase())
+            );
+        });
+    }, [state.projects, associatedProjectIds, currentUser?.id, partnerName]);
 
     // Calculate per-project financials
     const projectData = useMemo(() => {

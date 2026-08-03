@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { FiUser, FiMail, FiShield, FiLock, FiSave, FiCheck, FiArrowLeft } from 'react-icons/fi';
+import { FiUser, FiMail, FiShield, FiLock, FiSave, FiCheck, FiArrowLeft, FiEdit3, FiUpload } from 'react-icons/fi';
 import { useAuth, ROLE_LABELS } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
+import { storageService } from '../../services/storageService';
+import { pickImage } from '../../lib/cameraUtils';
+import { api } from '../../lib/apiClient';
+import { resolveImageUrl } from '../../lib/barcodeUtils';
 
-const API_URL = import.meta.env.VITE_API_URL;
 
 function Profile() {
-    const { currentUser, token } = useAuth();
+    const { currentUser } = useAuth();
     const [showPasswordForm, setShowPasswordForm] = useState(false);
     const [passwordData, setPasswordData] = useState({
         currentPassword: '',
@@ -16,6 +19,9 @@ function Profile() {
     const [passwordError, setPasswordError] = useState('');
     const [passwordSuccess, setPasswordSuccess] = useState('');
     const [saving, setSaving] = useState(false);
+    const [signatureSaving, setSignatureSaving] = useState(false);
+    const [signatureError, setSignatureError] = useState('');
+    const [signatureSuccess, setSignatureSuccess] = useState('');
 
     const handlePasswordChange = async (e) => {
         e.preventDefault();
@@ -34,11 +40,11 @@ function Profile() {
 
         setSaving(true);
         try {
-            const response = await fetch(`${API_URL}/endpoints/auth.php?action=update`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/endpoints/auth.php?action=update`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${localStorage.getItem('jvj_token') || localStorage.getItem('loteclick_token')}`
                 },
                 body: JSON.stringify({
                     id: currentUser.id,
@@ -72,6 +78,39 @@ function Profile() {
     };
 
     const roleColor = ROLE_COLORS[currentUser?.role] || '#6b7280';
+
+    const handleSignatureUpload = async () => {
+        try {
+            setSignatureError('');
+            setSignatureSuccess('');
+            const result = await pickImage({ allowPdf: false });
+            if (!result) return;
+
+            setSignatureSaving(true);
+
+            // Upload image
+            const { data: uploadData, error: uploadError } = await storageService.uploadFile(result.file, 'signatures');
+            if (uploadError) throw new Error(uploadError);
+
+            const signatureUrl = uploadData.url || uploadData;
+
+            // Save to profile via apiClient (handles auth token automatically)
+            const { data: updateData, error: updateError } = await api.put('endpoints/auth.php?action=update', {
+                id: currentUser.id,
+                signature_image: signatureUrl
+            });
+
+            if (updateError) throw new Error(updateError);
+
+            // Force refresh user data
+            window.location.reload();
+            
+        } catch (err) {
+            setSignatureError(err.message || 'Error al procesar la firma');
+        } finally {
+            setSignatureSaving(false);
+        }
+    };
 
     return (
         <div className="animate-fadeIn">
@@ -180,6 +219,50 @@ function Profile() {
                                     <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Rol</div>
                                     <div style={{ fontWeight: '500' }}>{ROLE_LABELS[currentUser?.role] || currentUser?.role || '-'}</div>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Signature Section */}
+                        <div style={{ marginTop: 'var(--spacing-6)', paddingTop: 'var(--spacing-4)', borderTop: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-4)' }}>
+                                <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                                    <FiEdit3 style={{ marginRight: '0.5rem' }} />
+                                    Firma Digitalizada
+                                </div>
+                                <button 
+                                    className="btn btn-outline btn-sm" 
+                                    onClick={handleSignatureUpload}
+                                    disabled={signatureSaving}
+                                >
+                                    <FiUpload /> {signatureSaving ? 'Guardando...' : 'Cargar Firma'}
+                                </button>
+                            </div>
+                            
+                            {signatureError && <div className="form-error mb-2">{signatureError}</div>}
+                            {signatureSuccess && <div style={{ color: 'var(--color-success)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{signatureSuccess}</div>}
+                            
+                            <div style={{ 
+                                background: 'var(--bg-secondary)', 
+                                padding: 'var(--spacing-4)', 
+                                borderRadius: 'var(--radius-md)', 
+                                textAlign: 'center',
+                                minHeight: '100px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '1px dashed var(--border-color)'
+                            }}>
+                                {currentUser?.signature_image || currentUser?.signatureImage ? (
+                                    <img 
+                                        src={resolveImageUrl(currentUser?.signature_image || currentUser?.signatureImage)} 
+                                        alt="Firma del usuario" 
+                                        style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain' }} 
+                                    />
+                                ) : (
+                                    <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>
+                                        No has configurado tu firma. Se usará solo tu nombre en los documentos.
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>

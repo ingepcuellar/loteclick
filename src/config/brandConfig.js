@@ -48,6 +48,27 @@ const brands = {
       webUrl: 'https://www.iteratech.co',
     },
   },
+
+  // ─── El Diamante Campestre ──────────────────────────────────────
+  diamante: {
+    appName: 'El Diamante Campestre',
+    subtitle: 'Proyecto Campestre',
+    description: 'Sistema de Gestión de Lotes - El Diamante Campestre',
+    emoji: '💎',
+    logo: '/logo-diamante.png',
+    favicon: '/favicon-diamante.svg',
+    tokenKey: 'diamante_token',
+    barcodePrefix: 'EDC',
+    legalName: 'Inversiones y Negocios De Los Llanos S.A.S',
+    nit: 'NIT: 902073354',
+    developer: {
+      name: 'ITERA TECH',
+      instagram: '@iteratech.co',
+      instagramUrl: 'https://instagram.com/iteratech.co',
+      web: 'www.iteratech.co',
+      webUrl: 'https://www.iteratech.co',
+    },
+  },
 };
 
 const activeBrandKey = import.meta.env.VITE_BRAND || 'predioclick';

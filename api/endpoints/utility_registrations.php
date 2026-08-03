@@ -11,6 +11,23 @@ $auth = requireAuth();
 $action = getParam('action', '');
 $method = getMethod();
 
+// Ensure table exists
+try {
+    $pdo = getConnection();
+    $pdo->exec("CREATE TABLE IF NOT EXISTS utility_registrations (
+        id CHAR(36) PRIMARY KEY,
+        sale_id CHAR(36) NOT NULL,
+        service_type ENUM('water', 'electricity', 'gas', 'other') NOT NULL,
+        amount DECIMAL(15,2) DEFAULT 0,
+        status ENUM('pending', 'paid') DEFAULT 'pending',
+        charge_date DATE NOT NULL,
+        paid_date DATE DEFAULT NULL,
+        notes TEXT DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_by CHAR(36) DEFAULT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+} catch (Exception $e) {}
+
 if ($action === 'bySale') { getBySale(); exit; }
 if ($action === 'summary') { getSummary(); exit; }
 

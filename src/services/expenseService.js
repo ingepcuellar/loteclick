@@ -24,6 +24,10 @@ export const expenseService = {
         return api.get(`endpoints/expenses.php?action=totalByProject&projectId=${projectId}`);
     },
 
+    async getPendingCommissions() {
+        return api.get('endpoints/expenses.php?action=pendingCommissions');
+    },
+
     async create(expense) {
         return api.post('endpoints/expenses.php', expense);
     },

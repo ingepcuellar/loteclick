@@ -6,7 +6,10 @@ import { paymentService } from '../services/paymentService';
 import { expenseService } from '../services/expenseService';
 import { installmentService } from '../services/installmentService';
 import { utilityService } from '../services/utilityService';
+import { desistimientoService } from '../services/desistimientoService';
+import { lotService } from '../services/lotService';
 import { useAuth } from './AuthContext';
+import { todayBogota } from '../lib/formatters';
 
 // Initial State
 const initialState = {
@@ -16,6 +19,7 @@ const initialState = {
     payments: [],
     expenses: [],
     utilityRegistrations: [],
+    desistimientos: [],
     currentProject: null,
     isLoading: true,
     error: null,
@@ -64,6 +68,13 @@ const ACTIONS = {
     ADD_UTILITY_REGISTRATION: 'ADD_UTILITY_REGISTRATION',
     UPDATE_UTILITY_REGISTRATION: 'UPDATE_UTILITY_REGISTRATION',
     DELETE_UTILITY_REGISTRATION: 'DELETE_UTILITY_REGISTRATION',
+
+    // Desistimientos
+    SET_DESISTIMIENTOS: 'SET_DESISTIMIENTOS',
+    ADD_DESISTIMIENTO: 'ADD_DESISTIMIENTO',
+    UPDATE_DESISTIMIENTO: 'UPDATE_DESISTIMIENTO',
+    DELETE_DESISTIMIENTO: 'DELETE_DESISTIMIENTO',
+    MARK_SALE_DESISTIDA: 'MARK_SALE_DESISTIDA',
 };
 
 // Reducer
@@ -119,8 +130,33 @@ function appReducer(state, action) {
         // Sales
         case ACTIONS.SET_SALES:
             return { ...state, sales: action.payload };
-        case ACTIONS.ADD_SALE:
-            return { ...state, sales: [...state.sales, action.payload] };
+        case ACTIONS.ADD_SALE: {
+            // Update ALL lot statuses in state.projects (primary lot + all saleLots)
+            const newSale = action.payload;
+            const newLotStatus = (newSale.paymentType === 'installments' || newSale.paymentType === 'credit') 
+                ? 'pending_initial' 
+                : 'sold';
+            // Collect all lot IDs from this sale
+            const allSoldLotIds = new Set();
+            if (newSale.lotId || newSale.lot_id) {
+                allSoldLotIds.add(newSale.lotId || newSale.lot_id);
+            }
+            // Include additional lots from grouped sales
+            (newSale.saleLotIds || []).forEach(id => allSoldLotIds.add(id));
+
+            const updatedProjectsOnAdd = state.projects.map(p => {
+                if (p.id !== (newSale.projectId || newSale.project_id)) return p;
+                const updatedLots = (p.lots || []).map(l => 
+                    allSoldLotIds.has(l.id) ? { ...l, status: newLotStatus } : l
+                );
+                return { ...p, lots: updatedLots };
+            });
+            return { 
+                ...state, 
+                sales: [...state.sales, newSale],
+                projects: updatedProjectsOnAdd
+            };
+        }
         case ACTIONS.UPDATE_SALE:
             return {
                 ...state,
@@ -128,12 +164,28 @@ function appReducer(state, action) {
                     s.id === action.payload.id ? action.payload : s
                 ),
             };
-        case ACTIONS.DELETE_SALE:
+        case ACTIONS.DELETE_SALE: {
+            // Restore lot to available when sale is deleted
+            const deletedSale = state.sales.find(s => s.id === action.payload);
+            let updatedProjectsOnDelete = state.projects;
+            if (deletedSale) {
+                updatedProjectsOnDelete = state.projects.map(p => {
+                    if (p.id !== (deletedSale.projectId || deletedSale.project_id)) return p;
+                    const updatedLots = (p.lots || []).map(l =>
+                        l.id === (deletedSale.lotId || deletedSale.lot_id)
+                            ? { ...l, status: 'available' }
+                            : l
+                    );
+                    return { ...p, lots: updatedLots };
+                });
+            }
             return {
                 ...state,
                 sales: state.sales.filter(s => s.id !== action.payload),
                 payments: state.payments.filter(p => p.saleId !== action.payload && p.sale_id !== action.payload),
+                projects: updatedProjectsOnDelete,
             };
+        }
 
         // Payments
         case ACTIONS.SET_PAYMENTS:
@@ -189,6 +241,49 @@ function appReducer(state, action) {
                 utilityRegistrations: state.utilityRegistrations.filter(u => u.id !== action.payload),
             };
 
+        // Desistimientos
+        case ACTIONS.SET_DESISTIMIENTOS:
+            return { ...state, desistimientos: action.payload };
+        case ACTIONS.ADD_DESISTIMIENTO:
+            return { ...state, desistimientos: [action.payload, ...state.desistimientos] };
+        case ACTIONS.UPDATE_DESISTIMIENTO:
+            return {
+                ...state,
+                desistimientos: state.desistimientos.map(d =>
+                    d.id === action.payload.id ? action.payload : d
+                ),
+            };
+        case ACTIONS.DELETE_DESISTIMIENTO:
+            return {
+                ...state,
+                desistimientos: state.desistimientos.filter(d => d.id !== action.payload),
+            };
+        // Marca una venta como desistida en el estado local (sin eliminarla)
+        case ACTIONS.MARK_SALE_DESISTIDA: {
+            const desistidaSaleId = action.payload;
+            const desistidaSale = state.sales.find(s => s.id === desistidaSaleId);
+            // Liberar el lote en el estado de proyectos
+            let updatedProjectsDesistida = state.projects;
+            if (desistidaSale) {
+                updatedProjectsDesistida = state.projects.map(p => {
+                    if (p.id !== (desistidaSale.projectId || desistidaSale.project_id)) return p;
+                    const updatedLots = (p.lots || []).map(l =>
+                        l.id === (desistidaSale.lotId || desistidaSale.lot_id)
+                            ? { ...l, status: 'available' }
+                            : l
+                    );
+                    return { ...p, lots: updatedLots };
+                });
+            }
+            return {
+                ...state,
+                sales: state.sales.map(s =>
+                    s.id === desistidaSaleId ? { ...s, status: 'desistida' } : s
+                ),
+                projects: updatedProjectsDesistida,
+            };
+        }
+
         default:
             return state;
     }
@@ -234,14 +329,35 @@ export function AppProvider({ children }) {
 
         try {
                 console.log('[AppContext] Fetching from API...');
+
+                // Fetch each endpoint independently — one failure won't crash the whole app
+                const safeGet = async (fetchFn, name) => {
+                    try {
+                        const res = await fetchFn();
+                        if (res.error) console.warn(`[AppContext] ${name} returned error:`, res.error);
+                        return res;
+                    } catch (err) {
+                        console.error(`[AppContext] ${name} threw:`, err);
+                        return { data: [], error: err.message };
+                    }
+                };
+
                 const [projectsRes, clientsRes, salesRes, paymentsRes, expensesRes, utilityRes] = await Promise.all([
-                    projectService.getAll(),
-                    clientService.getAll(),
-                    saleService.getAll(),
-                    paymentService.getAll(),
-                    expenseService.getAll(),
-                    utilityService.getAll(),
+                    safeGet(() => projectService.getAll(), 'projects'),
+                    safeGet(() => clientService.getAll(), 'clients'),
+                    safeGet(() => saleService.getAll(), 'sales'),
+                    safeGet(() => paymentService.getAll(), 'payments'),
+                    safeGet(() => expenseService.getAll(), 'expenses'),
+                    safeGet(() => utilityService.getAll(), 'utilities'),
                 ]);
+
+                // Fetch desistimientos separately so a missing table doesn't crash the whole app
+                let desistimientosRes = { data: [] };
+                try {
+                    desistimientosRes = await desistimientoService.getAll();
+                } catch (desistErr) {
+                    console.warn('[AppContext] Could not load desistimientos (table may not exist yet):', desistErr);
+                }
 
                 console.log('[AppContext] Data fetched:', {
                     projects: projectsRes.data?.length,
@@ -254,20 +370,33 @@ export function AppProvider({ children }) {
 
                 // Normalize data to frontend format
                 const normalizeSales = (sales) => {
-                    return (sales || []).map(sale => ({
-                        ...sale,
-                        totalPrice: sale.sale_price || sale.totalPrice,
-                        saleDate: sale.sale_date || sale.saleDate,
-                        createdAt: sale.created_at || sale.createdAt,
-                        paymentType: sale.payment_type === 'credit' ? 'installments' : (sale.payment_type || sale.paymentType || 'cash'),
-                        downPayment: sale.down_payment || sale.downPayment || 0,
-                        numberOfInstallments: sale.installments || sale.numberOfInstallments || 1,
-                        lotNumber: sale.lot?.number || sale.lotNumber,
-                        projectId: sale.project_id || sale.projectId,
-                        lotId: sale.lot_id || sale.lotId,
-                        clientId: sale.client_id || sale.clientId,
-                        commissionAgent: sale.commission_agent || sale.commissionAgent || null
-                    }));
+                    return (sales || []).map(sale => {
+                        // For grouped 'Venta Única' sales, build lot number from sale_lots
+                        const rawSaleLots = sale.sale_lots || [];
+                        const lotNumber = rawSaleLots.length > 1
+                            ? rawSaleLots.map(sl => sl.lot_number).join(', ')
+                            : (sale.lot?.number || sale.lot_number || sale.lotNumber);
+
+                        return {
+                            ...sale,
+                            totalPrice: sale.sale_price || sale.totalPrice,
+                            saleDate: sale.sale_date || sale.saleDate,
+                            createdAt: sale.created_at || sale.createdAt,
+                            paymentType: sale.payment_type === 'credit' ? 'installments' : (sale.payment_type || sale.paymentType || 'cash'),
+                            downPayment: sale.down_payment || sale.downPayment || 0,
+                            numberOfInstallments: sale.installments || sale.numberOfInstallments || 1,
+                            lotNumber,
+                            lotManzana: sale.lot?.manzana || sale.lot_manzana || sale.lotManzana || null,
+                            lotEtapaName: sale.lot?.etapa_name || sale.lot?.etapaName || sale.lot_etapa_name || sale.lotEtapaName || null,
+                            projectId: sale.project_id || sale.projectId,
+                            lotId: sale.lot_id || sale.lotId,
+                            clientId: sale.client_id || sale.clientId,
+                            commissionAgent: sale.commission_agent || sale.commissionAgent || null,
+                            saleLots: rawSaleLots,
+                            // Status: 'active' | 'desistida' | 'completada'
+                            status: sale.status || 'active',
+                        };
+                    });
                 };
 
                 const normalizeClients = (clients) => {
@@ -296,6 +425,8 @@ export function AppProvider({ children }) {
                         partnerId: expense.partner_id || expense.partnerId,
                         date: expense.expense_date || expense.date,
                         attachment: expense.attachment || null,
+                        paymentMethod: expense.payment_method || expense.paymentMethod || 'cash',
+                        bankAccountId: expense.bank_account_id || expense.bankAccountId || null,
                         selectedLots: expense.selected_lots ? (typeof expense.selected_lots === 'string' ? JSON.parse(expense.selected_lots) : expense.selected_lots) : null,
                         createdAt: expense.created_at || expense.createdAt
                     }));
@@ -321,6 +452,7 @@ export function AppProvider({ children }) {
                         payments: normalizePayments(paymentsRes.data),
                         expenses: normalizeExpenses(expensesRes.data),
                         utilityRegistrations: normalizeUtilities(utilityRes.data),
+                        desistimientos: desistimientosRes.data || [],
                     }
                 });
                 console.log('[AppContext] Data loaded successfully!');
@@ -374,6 +506,42 @@ export function AppProvider({ children }) {
         return state.projects.find(p => p.id === id);
     }, [state.projects]);
 
+    // Add a single lot to an existing project (without full wizard)
+    const addLot = useCallback(async (lotData) => {
+        const { data, error } = await lotService.create(lotData);
+        if (error) {
+            throw new Error(typeof error === 'object' ? (error.message || JSON.stringify(error)) : error);
+        }
+        // Update the project's lots array in state
+        dispatch({
+            type: ACTIONS.UPDATE_PROJECT,
+            payload: {
+                ...state.projects.find(p => p.id === (lotData.project_id || lotData.projectId)),
+                lots: [
+                    ...(state.projects.find(p => p.id === (lotData.project_id || lotData.projectId))?.lots || []),
+                    data
+                ]
+            }
+        });
+        return data;
+    }, [state.projects]);
+
+    // Delete a single lot (only available lots)
+    const deleteLot = useCallback(async (lotId, projectId) => {
+        const { error } = await lotService.delete(lotId);
+        if (error) {
+            throw new Error(typeof error === 'object' ? (error.message || JSON.stringify(error)) : error);
+        }
+        // Remove lot from project state
+        const project = state.projects.find(p => p.id === projectId);
+        if (project) {
+            dispatch({
+                type: ACTIONS.UPDATE_PROJECT,
+                payload: { ...project, lots: (project.lots || []).filter(l => l.id !== lotId) }
+            });
+        }
+    }, [state.projects]);
+
     // ============================================
     // CLIENT ACTIONS
     // ============================================
@@ -424,7 +592,7 @@ export function AppProvider({ children }) {
             lot_id: sale.lotId,
             client_id: sale.clientId,
             sale_price: sale.totalPrice,
-            sale_date: sale.saleDate || new Date().toISOString().split('T')[0],
+            sale_date: sale.saleDate || todayBogota(),
             payment_type: sale.paymentType === 'installments' ? 'credit' : (sale.paymentType || 'cash'),
             down_payment: sale.downPayment || 0,
             installments: sale.numberOfInstallments || 1,
@@ -436,6 +604,9 @@ export function AppProvider({ children }) {
             discount_amount: sale.discountAmount || null,
             discount_authorized_by: sale.discountAuthorizedBy || null,
             discount_partner_name: sale.discountPartnerName || null,
+            include_acometida: sale.includeAcometida || false,
+            acometida_value: sale.acometidaValue || 0,
+            acometida_paid: sale.acometidaPaid || false,
             lot_number: sale.lotNumber || null,
             client_name: sale.clientName || null,
             sale_lots: sale.saleLots || null,
@@ -443,7 +614,8 @@ export function AppProvider({ children }) {
         const { data, error } = await saleService.create(saleData);
         if (error) {
             console.error('Error creating sale:', error);
-            return null;
+            // Propagate error so the caller can show the message to the user
+            throw new Error(error.message || 'Error al crear la venta');
         }
         // Normalize the response data to frontend format
         const normalizedSale = {
@@ -463,7 +635,7 @@ export function AppProvider({ children }) {
         // Generate installments for credit sales
         if ((sale.paymentType === 'installments' || sale.paymentType === 'credit') && sale.numberOfInstallments > 1) {
             const totalAfterDownPayment = parseFloat(sale.totalPrice) - parseFloat(sale.downPayment || 0);
-            const startDate = sale.saleDate || new Date().toISOString().split('T')[0];
+            const startDate = sale.saleDate || todayBogota();
 
             try {
                 const downPaymentAmount = parseFloat(sale.downPayment || 0);
@@ -474,7 +646,8 @@ export function AppProvider({ children }) {
                     sale.numberOfInstallments,
                     startDate,
                     downPaymentAmount,
-                    separeAmount
+                    separeAmount,
+                    sale.customPlan || null
                 );
                 if (installmentError) {
                     console.error('Error generating installments:', installmentError);
@@ -486,7 +659,36 @@ export function AppProvider({ children }) {
             }
         }
 
-        dispatch({ type: ACTIONS.ADD_SALE, payload: normalizedSale });
+        // Build list of ALL sold lot IDs (primary + saleLots) for the reducer
+        const allSaleLotIds = [];
+        if (sale.saleLots && Array.isArray(sale.saleLots)) {
+            sale.saleLots.forEach(sl => {
+                const id = sl.lotId || sl.lot_id;
+                if (id) allSaleLotIds.push(id);
+            });
+        }
+
+        dispatch({ 
+            type: ACTIONS.ADD_SALE, 
+            payload: { 
+                ...normalizedSale,
+                saleLotIds: allSaleLotIds  // extra lot IDs for reducer to mark as sold
+            } 
+        });
+
+        // Refresh the project from API to guarantee the matrix reflects DB state
+        try {
+            const projectId = sale.projectId || saleData.project_id;
+            if (projectId) {
+                const { data: freshProject } = await projectService.getById(projectId);
+                if (freshProject) {
+                    dispatch({ type: ACTIONS.UPDATE_PROJECT, payload: freshProject });
+                }
+            }
+        } catch (err) {
+            // Not critical - matrix will still show updated state from reducer
+        }
+
         return normalizedSale;
     }, []);
 
@@ -503,9 +705,10 @@ export function AppProvider({ children }) {
         const { error } = await saleService.delete(saleId);
         if (error) {
             console.error('Error deleting sale:', error);
-            return;
+            return { success: false, error };
         }
         dispatch({ type: ACTIONS.DELETE_SALE, payload: saleId });
+        return { success: true };
     }, []);
 
     const getSaleById = useCallback((id) => {
@@ -527,7 +730,7 @@ export function AppProvider({ children }) {
         const paymentData = {
             sale_id: payment.saleId,
             amount: payment.amount,
-            payment_date: payment.paymentDate || new Date().toISOString().split('T')[0],
+            payment_date: payment.paymentDate || todayBogota(),
             payment_method: payment.paymentMethod || 'cash',
             receipt_image: payment.receiptImage || null,
             notes: payment.notes,
@@ -593,10 +796,13 @@ export function AppProvider({ children }) {
             description: expense.description,
             amount: expense.amount,
             category: expense.category,
-            expense_date: expense.date || new Date().toISOString().split('T')[0],
+            expense_date: expense.date || todayBogota(),
             notes: expense.notes,
             attachment: expense.attachment || null,
             selected_lots: expense.selectedLots ? JSON.stringify(expense.selectedLots) : null,
+            payment_method: expense.payment_method || expense.paymentMethod || 'cash',
+            sale_id: expense.sale_id || null,
+            bank_account_id: expense.bank_account_id || expense.bankAccountId || null,
         };
         const { data, error } = await expenseService.create(expenseData);
         if (error) {
@@ -608,6 +814,7 @@ export function AppProvider({ children }) {
             projectId: data.project_id || data.projectId,
             partnerId: data.partner_id || data.partnerId,
             date: data.expense_date || data.date,
+            paymentMethod: data.payment_method || data.paymentMethod || 'cash',
             createdAt: data.created_at || data.createdAt
         };
         dispatch({ type: ACTIONS.ADD_EXPENSE, payload: normalizedData });
@@ -667,11 +874,14 @@ export function AppProvider({ children }) {
     // STATISTICS
     // ============================================
     const getStats = useCallback(() => {
+        // Solo ventas activas (excluir desistidas de los conteos de ingresos)
+        const activeSales = state.sales.filter(s => (s.status || 'active') !== 'desistida');
+
         const totalProjects = state.projects.length;
         const totalClients = state.clients.length;
-        const totalSales = state.sales.length;
+        const totalSales = activeSales.length;
 
-        const totalRevenue = state.sales.reduce((sum, s) =>
+        const totalRevenue = activeSales.reduce((sum, s) =>
             sum + parseFloat(s.totalPrice || s.sale_price || 0), 0
         );
 
@@ -686,10 +896,12 @@ export function AppProvider({ children }) {
         );
 
         const soldLots = state.projects.reduce((sum, p) =>
-            sum + (p.lots?.filter(l => l.status === 'sold').length || 0), 0
+            sum + (p.lots?.filter(l => l.status === 'sold' || l.status === 'pending_initial').length || 0), 0
         );
 
-        const availableLots = totalLots - soldLots;
+        const availableLots = state.projects.reduce((sum, p) =>
+            sum + (p.lots?.filter(l => l.status === 'available' || !l.status).length || 0), 0
+        );
 
         const totalExpenses = state.expenses.reduce((sum, e) =>
             sum + parseFloat(e.amount || 0), 0
@@ -760,7 +972,7 @@ export function AppProvider({ children }) {
                 service_type: registration.serviceType,
                 amount: registration.amount,
                 status: registration.status || 'pending',
-                charge_date: registration.chargeDate || new Date().toISOString().split('T')[0],
+                charge_date: registration.chargeDate || todayBogota(),
                 paid_date: registration.paidDate || null,
                 notes: registration.notes,
             };
@@ -804,26 +1016,65 @@ export function AppProvider({ children }) {
             }
             return result;
         },
+        getAllInstallmentsBySale: async (saleId) => {
+            return await installmentService.getBySale(saleId);
+        },
         markInstallmentAsPaid: async (installmentId, paymentId, paidAmount) => {
             return await installmentService.markAsPaid(installmentId, paymentId);
+        },
+        markInstallmentAsPartial: async (installmentId, paidAmount) => {
+            return await installmentService.markAsPartial(installmentId, paidAmount);
         },
         calculateRestructureOptions: async (saleId, paymentAmount) => {
             return await installmentService.calculateRestructure(saleId, paymentAmount);
         },
         applyRestructure: async (saleId, option, restructureData, paymentId) => {
             const optionData = option === 'reduceTime' ? restructureData.reduceTime : restructureData.reducePayment;
-            const startDate = new Date().toISOString().split('T')[0];
+            const startDate = todayBogota();
             return await installmentService.restructurePayments(saleId, optionData.newNumInstallments, startDate);
         },
         autoRedistributeInstallments: async (saleId, paymentAmount, paymentId) => {
             return await installmentService.autoRedistribute(saleId, paymentAmount, paymentId);
+        },
+        // Desistimientos
+        addDesistimiento: async (data) => {
+            const { data: result, error } = await desistimientoService.create(data);
+            if (error) {
+                console.error('Error creating desistimiento:', error);
+                return null;
+            }
+            dispatch({ type: ACTIONS.ADD_DESISTIMIENTO, payload: result });
+            // Marcar la venta como desistida en estado local (no eliminarla)
+            dispatch({ type: ACTIONS.MARK_SALE_DESISTIDA, payload: data.sale_id || data.saleId });
+            return result;
+        },
+        updateDesistimiento: async (id, data) => {
+            const { data: result, error } = await desistimientoService.update(id, data);
+            if (error) {
+                console.error('Error updating desistimiento:', error);
+                return null;
+            }
+            dispatch({ type: ACTIONS.UPDATE_DESISTIMIENTO, payload: result });
+            return result;
+        },
+        deleteDesistimiento: async (id) => {
+            const { error } = await desistimientoService.delete(id);
+            if (error) { console.error('Error deleting desistimiento:', error); return; }
+            dispatch({ type: ACTIONS.DELETE_DESISTIMIENTO, payload: id });
+        },
+        getDesistimientosByProject: (projectId) => {
+            return state.desistimientos.filter(d => d.project_id === projectId);
         },
         // Stats
         getStats,
         // Utils
         generateId,
         refreshData,
+        // Lot management
+        addLot,
+        deleteLot,
     };
+
 
     return (
         <AppContext.Provider value={value}>

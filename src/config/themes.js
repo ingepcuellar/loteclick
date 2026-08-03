@@ -65,6 +65,50 @@ const themes = {
     '--color-error': '#ef4444',
     '--color-info': '#3b82f6',
   },
+
+  // ─── El Diamante Campestre — Dark Mode (Silver/Black) ──
+  diamante: {
+    // Primary Colors — Silver / Neutral Grays
+    '--color-primary-50': '#f8fafc',
+    '--color-primary-100': '#f1f5f9',
+    '--color-primary-200': '#e2e8f0',
+    '--color-primary-300': '#cbd5e1',
+    '--color-primary-400': '#94a3b8',
+    '--color-primary-500': '#64748b', // Slate/Silver
+    '--color-primary-600': '#475569',
+    '--color-primary-700': '#334155',
+    '--color-primary-800': '#1e293b',
+    '--color-primary-900': '#0f172a',
+
+    // Accent Colors — Silver / White
+    '--color-accent-400': '#e2e8f0',
+    '--color-accent-500': '#cbd5e1',
+    '--color-accent-600': '#94a3b8',
+
+    // Background Colors — Elegant Light Mode (Silver/White)
+    '--bg-primary': '#f8fafc', // Slate 50
+    '--bg-secondary': '#ffffff', // White
+    '--bg-tertiary': '#f1f5f9', // Slate 100
+    '--bg-card': 'rgba(255, 255, 255, 0.95)',
+    '--bg-glass': 'rgba(0, 0, 0, 0.03)',
+
+    // Text Colors — Dark on light
+    '--text-primary': '#0f172a', // Slate 900
+    '--text-secondary': '#334155', // Slate 700
+    '--text-muted': '#64748b', // Slate 500
+    '--text-inverse': '#ffffff',
+
+    // Border Colors
+    '--border-color': 'rgba(15, 23, 42, 0.1)',
+    '--border-color-strong': 'rgba(15, 23, 42, 0.2)',
+
+    // Shadows
+    '--shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    '--shadow-md': '0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05)',
+    '--shadow-lg': '0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05)',
+    '--shadow-xl': '0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+    '--shadow-glow': '0 0 20px rgba(100, 116, 139, 0.2)',
+  },
 };
 
 /**

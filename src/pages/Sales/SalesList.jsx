@@ -10,17 +10,32 @@ import {
     FiCalendar
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatDate } from '../../lib/formatters';
 
 function SalesList() {
     const { state, getPaymentsBySale } = useApp();
+    const { isPartner, isAdmin, currentUser } = useAuth();
+    // Filtrar proyectos del socio
+    const partnerProjectIds = currentUser?.associated_projects || currentUser?.associatedProjects || [];
+    const isRestrictedPartner = isPartner() && !isAdmin();
+    const visibleProjectIds = isRestrictedPartner && partnerProjectIds.length > 0
+        ? partnerProjectIds.map(String)
+        : null;
+    const visibleProjects = isRestrictedPartner
+        ? state.projects.filter(p => (visibleProjectIds || []).includes(String(p.id)))
+        : state.projects;
     const [searchTerm, setSearchTerm] = useState('');
     const [filterProject, setFilterProject] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
-
-
+    const [filterManzana, setFilterManzana] = useState('');
+    const [filterEtapa, setFilterEtapa] = useState('');
 
     const getSaleStatus = (sale) => {
+        // Si la venta fue desistida, priorizamos ese estado siempre
+        if ((sale.status || 'active') === 'desistida') {
+            return { label: 'Desistida', class: 'badge-warning-amber' };
+        }
         const payments = getPaymentsBySale(sale.id);
         const paid = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
         const total = parseFloat(sale.totalPrice || 0);
@@ -30,25 +45,43 @@ function SalesList() {
         return { label: 'Pendiente', class: 'badge-error' };
     };
 
+    // Obtener manzanas y etapas únicas para los filtros
+    const uniqueManzanas = [...new Set(
+        state.sales.map(s => s.lotManzana || s.lot_manzana).filter(Boolean)
+    )].sort();
+    const uniqueEtapas = [...new Set(
+        state.sales.map(s => s.lotEtapaName || s.lot_etapa_name).filter(Boolean)
+    )].sort();
+
     const filteredSales = state.sales.filter(sale => {
         const client = state.clients.find(c => c.id === sale.clientId);
         const project = state.projects.find(p => p.id === sale.projectId);
+        const manzana = sale.lotManzana || sale.lot_manzana || '';
+        const etapa = sale.lotEtapaName || sale.lot_etapa_name || '';
 
-        const matchesSearch =
+        // Filtro por rol: socios solo ven ventas de sus proyectos
+        if (visibleProjectIds && !visibleProjectIds.includes(String(sale.projectId || sale.project_id || ''))) return false;
+
+        const matchesSearch = !searchTerm ||
             (client?.name || client?.fullName)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (client?.document || '')?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             project?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            sale.lotNumber?.toString().includes(searchTerm);
+            sale.lotNumber?.toString().includes(searchTerm) ||
+            manzana.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            etapa.toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesProject = !filterProject || sale.projectId === filterProject;
+        const matchesManzana = !filterManzana || manzana === filterManzana;
+        const matchesEtapa = !filterEtapa || etapa === filterEtapa;
 
         const status = getSaleStatus(sale);
         const matchesStatus = !filterStatus ||
             (filterStatus === 'paid' && status.label === 'Pagado') ||
             (filterStatus === 'partial' && status.label === 'Parcial') ||
-            (filterStatus === 'pending' && status.label === 'Pendiente');
+            (filterStatus === 'pending' && status.label === 'Pendiente') ||
+            (filterStatus === 'desistida' && status.label === 'Desistida');
 
-        return matchesSearch && matchesProject && matchesStatus;
+        return matchesSearch && matchesProject && matchesManzana && matchesEtapa && matchesStatus;
     });
 
     return (
@@ -81,7 +114,7 @@ function SalesList() {
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="Buscar por cliente, cédula, proyecto o lote..."
+                            placeholder="Buscar por cliente, cédula, proyecto, lote, manzana o etapa..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{ paddingLeft: 'var(--spacing-10)' }}
@@ -91,25 +124,54 @@ function SalesList() {
                     <select
                         className="form-select"
                         value={filterProject}
-                        onChange={(e) => setFilterProject(e.target.value)}
-                        style={{ width: '200px' }}
+                        onChange={(e) => { setFilterProject(e.target.value); setFilterManzana(''); setFilterEtapa(''); }}
+                        style={{ width: '180px' }}
                     >
                         <option value="">Todos los proyectos</option>
-                        {state.projects.map(p => (
+                        {visibleProjects.map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                     </select>
+
+                    {uniqueEtapas.length > 0 && (
+                        <select
+                            className="form-select"
+                            value={filterEtapa}
+                            onChange={(e) => setFilterEtapa(e.target.value)}
+                            style={{ width: '150px' }}
+                        >
+                            <option value="">Todas las etapas</option>
+                            {uniqueEtapas.map(e => (
+                                <option key={e} value={e}>{e}</option>
+                            ))}
+                        </select>
+                    )}
+
+                    {uniqueManzanas.length > 0 && (
+                        <select
+                            className="form-select"
+                            value={filterManzana}
+                            onChange={(e) => setFilterManzana(e.target.value)}
+                            style={{ width: '150px' }}
+                        >
+                            <option value="">Todas las manzanas</option>
+                            {uniqueManzanas.map(m => (
+                                <option key={m} value={m}>Manzana {m}</option>
+                            ))}
+                        </select>
+                    )}
 
                     <select
                         className="form-select"
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
-                        style={{ width: '150px' }}
+                        style={{ width: '140px' }}
                     >
                         <option value="">Todos</option>
                         <option value="paid">Pagados</option>
                         <option value="partial">Parciales</option>
                         <option value="pending">Pendientes</option>
+                        <option value="desistida">Desistidas</option>
                     </select>
                 </div>
             </div>
@@ -169,6 +231,8 @@ function SalesList() {
                                                     <div style={{ fontWeight: '500' }}>{project?.name || '-'}</div>
                                                     <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>
                                                         Lote {sale.lotNumber}
+                                                        {(sale.lotManzana || sale.lot_manzana) && ` · Mzn ${sale.lotManzana || sale.lot_manzana}`}
+                                                        {(sale.lotEtapaName || sale.lot_etapa_name) && ` · ${sale.lotEtapaName || sale.lot_etapa_name}`}
                                                     </div>
                                                 </div>
                                             </td>
@@ -200,9 +264,26 @@ function SalesList() {
                                                 </div>
                                             </td>
                                             <td>
-                                                <span className={`badge ${status.class}`}>
-                                                    {status.label}
-                                                </span>
+                                                {status.label === 'Desistida' ? (
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        padding: '3px 8px',
+                                                        borderRadius: 'var(--radius-full)',
+                                                        fontSize: 'var(--font-size-xs)',
+                                                        fontWeight: '600',
+                                                        background: 'rgba(245,158,11,0.15)',
+                                                        color: '#b45309',
+                                                        border: '1px solid rgba(245,158,11,0.35)',
+                                                    }}>
+                                                        ⚠️ Desistida
+                                                    </span>
+                                                ) : (
+                                                    <span className={`badge ${status.class}`}>
+                                                        {status.label}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td>
                                                 <div className="table-actions">
@@ -239,10 +320,25 @@ function SalesList() {
                                             </div>
                                             <div>
                                                 <div className="mobile-card-title">{client?.name || client?.fullName || '-'}</div>
-                                                <div className="mobile-card-subtitle">{project?.name || '-'} · Lote {sale.lotNumber}</div>
+                                                <div className="mobile-card-subtitle">
+                                                    {project?.name || '-'} · Lote {sale.lotNumber}
+                                                    {(sale.lotManzana || sale.lot_manzana) && ` · Mzn ${sale.lotManzana || sale.lot_manzana}`}
+                                                </div>
                                             </div>
                                         </div>
-                                        <span className={`badge ${status.class}`}>{status.label}</span>
+                                        {status.label === 'Desistida' ? (
+                                            <span style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                                padding: '3px 8px', borderRadius: 'var(--radius-full)',
+                                                fontSize: 'var(--font-size-xs)', fontWeight: '600',
+                                                background: 'rgba(245,158,11,0.15)', color: '#b45309',
+                                                border: '1px solid rgba(245,158,11,0.35)',
+                                            }}>
+                                                ⚠️ Desistida
+                                            </span>
+                                        ) : (
+                                            <span className={`badge ${status.class}`}>{status.label}</span>
+                                        )}
                                     </div>
                                     <div className="mobile-card-body">
                                         <div className="mobile-card-row">

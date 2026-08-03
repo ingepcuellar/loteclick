@@ -30,6 +30,7 @@ switch ($method) {
         updateSale($id);
         break;
     case 'DELETE':
+        requireRole('admin');
         $id = getParam('id');
         if (!$id) jsonError('ID requerido');
         deleteSale($id);
@@ -40,33 +41,50 @@ switch ($method) {
 
 function enrichSale($pdo, $sale) {
     // Get project info
-    $stmt = $pdo->prepare("SELECT id, name, location FROM projects WHERE id = ?");
-    $stmt->execute([$sale['project_id']]);
-    $sale['project'] = $stmt->fetch() ?: null;
+    try {
+        $stmt = $pdo->prepare("SELECT id, name, location FROM projects WHERE id = ?");
+        $stmt->execute([$sale['project_id']]);
+        $sale['project'] = $stmt->fetch() ?: null;
+    } catch (Exception $e) { $sale['project'] = null; }
 
-    // Get lot info
-    $stmt = $pdo->prepare("SELECT id, number, area, price FROM lots WHERE id = ?");
-    $stmt->execute([$sale['lot_id']]);
-    $sale['lot'] = $stmt->fetch() ?: null;
+    // Get lot info (with manzana/etapa_name if columns exist)
+    try {
+        $stmt = $pdo->prepare("SELECT id, number, area, price, manzana, etapa_name FROM lots WHERE id = ?");
+        $stmt->execute([$sale['lot_id']]);
+        $sale['lot'] = $stmt->fetch() ?: null;
+    } catch (Exception $e) {
+        // Fallback without manzana/etapa_name if columns don't exist yet
+        try {
+            $stmt = $pdo->prepare("SELECT id, number, area, price FROM lots WHERE id = ?");
+            $stmt->execute([$sale['lot_id']]);
+            $sale['lot'] = $stmt->fetch() ?: null;
+        } catch (Exception $e2) { $sale['lot'] = null; }
+    }
 
     // Get client info
-    $stmt = $pdo->prepare("SELECT id, name, document, phone, email, address FROM clients WHERE id = ?");
-    $stmt->execute([$sale['client_id']]);
-    $sale['client'] = $stmt->fetch() ?: null;
+    try {
+        $stmt = $pdo->prepare("SELECT id, name, document, phone, email, address FROM clients WHERE id = ?");
+        $stmt->execute([$sale['client_id']]);
+        $sale['client'] = $stmt->fetch() ?: null;
+    } catch (Exception $e) { $sale['client'] = null; }
 
     // Get payments
-    $stmt = $pdo->prepare("SELECT * FROM payments WHERE sale_id = ? ORDER BY payment_date DESC");
-    $stmt->execute([$sale['id']]);
-    $sale['payments'] = $stmt->fetchAll();
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM payments WHERE sale_id = ? ORDER BY payment_date DESC");
+        $stmt->execute([$sale['id']]);
+        $sale['payments'] = $stmt->fetchAll();
+    } catch (Exception $e) { $sale['payments'] = []; }
 
-    // Get sale_lots (for grouped multi-lot sales)
-    $stmt = $pdo->prepare("SELECT sl.*, l.area FROM sale_lots sl LEFT JOIN lots l ON sl.lot_id = l.id WHERE sl.sale_id = ? ORDER BY sl.lot_number");
-    $stmt->execute([$sale['id']]);
-    $saleLots = $stmt->fetchAll();
-    $sale['sale_lots'] = $saleLots;
+    // Get sale_lots (table may not exist in all deployments)
+    try {
+        $stmt = $pdo->prepare("SELECT sl.*, l.area FROM sale_lots sl LEFT JOIN lots l ON sl.lot_id = l.id WHERE sl.sale_id = ? ORDER BY LENGTH(sl.lot_number) ASC, sl.lot_number ASC");
+        $stmt->execute([$sale['id']]);
+        $sale['sale_lots'] = $stmt->fetchAll();
+    } catch (Exception $e) { $sale['sale_lots'] = []; }
 
     return $sale;
 }
+
 
 function getAllSales() {
     $pdo = getConnection();
@@ -112,11 +130,24 @@ function createSale() {
     $body = getJsonBody();
     $id = generateUUID();
 
+    forceUppercase($body, ['notes', 'commission_agent']);
+
+    // ✅ VALIDACIÓN: Verificar que el lote no esté ya vendido
+    $checkLotId = $body['lot_id'] ?? $body['lotId'] ?? null;
+    if ($checkLotId) {
+        $checkStmt = $pdo->prepare("SELECT id, status FROM lots WHERE id = ?");
+        $checkStmt->execute([$checkLotId]);
+        $checkLot = $checkStmt->fetch();
+        if ($checkLot && in_array($checkLot['status'], ['sold', 'pending_initial'])) {
+            jsonError('Este lote ya fue vendido o tiene una venta en proceso. No se puede vender dos veces.', 409);
+        }
+    }
+
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare(
-            "INSERT INTO sales (id, project_id, lot_id, client_id, sale_price, sale_date, payment_type, down_payment, installments, notes, commission_agent, commission_agent_id, commission_amount, original_price, discount_amount, discount_authorized_by, discount_partner_name, discount_status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO sales (id, project_id, lot_id, client_id, sale_price, sale_date, payment_type, down_payment, installments, notes, commission_agent, commission_agent_id, commission_amount, original_price, discount_amount, discount_authorized_by, discount_partner_name, discount_status, include_acometida, acometida_value, acometida_paid) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
 
         $paymentType = $body['payment_type'] ?? $body['paymentType'] ?? 'cash';
@@ -129,6 +160,10 @@ function createSale() {
         $discountStatus = ($discountAmount && $discountAmount > 0) ? 'pending' : null;
         $originalPrice = $body['original_price'] ?? $body['originalPrice'] ?? null;
         if ($originalPrice) $originalPrice = floatval($originalPrice);
+
+        $include_acometida = isset($body['include_acometida']) ? ($body['include_acometida'] ? 1 : 0) : 0;
+        $acometida_value = isset($body['acometida_value']) ? floatval($body['acometida_value']) : 0;
+        $acometida_paid = isset($body['acometida_paid']) ? ($body['acometida_paid'] ? 1 : 0) : 0;
 
         $stmt->execute([
             $id,
@@ -149,7 +184,10 @@ function createSale() {
             $discountAmount,
             $discountAuthorizedBy,
             $discountPartnerName,
-            $discountStatus
+            $discountStatus,
+            $include_acometida,
+            $acometida_value,
+            $acometida_paid
         ]);
 
         // Mark lot status: pending_initial for credit sales, sold for cash
@@ -232,7 +270,16 @@ function createSale() {
 
         $stmt = $pdo->prepare("SELECT * FROM sales WHERE id = ?");
         $stmt->execute([$id]);
-        jsonResponse(['data' => $stmt->fetch()], 201);
+        $saleRow = $stmt->fetch();
+
+        // Audit log
+        $userName = $auth['name'] ?? $auth['email'] ?? 'Sistema';
+        $lotNum = $body['lot_number'] ?? $body['lotNumber'] ?? 'N/A';
+        $clientNm = $body['client_name'] ?? $body['clientName'] ?? '';
+        logAudit($auth['sub'] ?? '', $userName, 'create', 'sale', $id, null, null,
+            null, "Venta creada: Lote #$lotNum — Cliente $clientNm — $" . number_format(floatval($body['sale_price'] ?? $body['totalPrice'] ?? 0), 0, '.', '.'));
+
+        jsonResponse(['data' => $saleRow], 201);
 
     } catch (Exception $e) {
         $pdo->rollBack();
@@ -241,19 +288,39 @@ function createSale() {
 }
 
 function updateSale($id) {
+    global $auth;
     $pdo = getConnection();
     $body = getJsonBody();
+
+    // Check role: only admin and treasurer can update sales
+    $userRole = $auth['role'] ?? 'seller';
+    $userRoles = [];
+    if (is_string($userRole) && str_starts_with($userRole, '[')) {
+        $userRoles = json_decode($userRole, true) ?: [$userRole];
+    } elseif ($userRole === 'seller_treasurer') {
+        $userRoles = ['seller', 'treasurer'];
+    } else {
+        $userRoles = [$userRole];
+    }
+    
+    if (!in_array('admin', $userRoles) && !in_array('treasurer', $userRoles)) {
+        jsonError('Solo administradores y tesoreros pueden editar ventas', 403);
+    }
+
+    forceUppercase($body, ['notes', 'commission_agent']);
 
     $paymentType = $body['payment_type'] ?? $body['paymentType'] ?? 'cash';
     if ($paymentType === 'installments') $paymentType = 'credit';
 
-    $stmt = $pdo->prepare(
-        "UPDATE sales SET project_id = ?, lot_id = ?, client_id = ?, sale_price = ?, sale_date = ?, 
+    $include_acometida = isset($body['include_acometida']) ? ($body['include_acometida'] ? 1 : 0) : 0;
+    $acometida_value = isset($body['acometida_value']) ? floatval($body['acometida_value']) : 0;
+    $acometida_paid = isset($body['acometida_paid']) ? ($body['acometida_paid'] ? 1 : 0) : 0;
+
+    $fields = "project_id = ?, lot_id = ?, client_id = ?, sale_price = ?, sale_date = ?, 
          payment_type = ?, down_payment = ?, installments = ?, notes = ?, commission_agent = ?,
          commission_agent_id = ?, commission_amount = ?, original_price = ?, discount_amount = ?,
-         discount_authorized_by = ?, discount_partner_name = ?, discount_status = ? WHERE id = ?"
-    );
-    $stmt->execute([
+         discount_authorized_by = ?, discount_partner_name = ?, discount_status = ?";
+    $params = [
         $body['project_id'] ?? $body['projectId'],
         $body['lot_id'] ?? $body['lotId'],
         $body['client_id'] ?? $body['clientId'],
@@ -273,9 +340,55 @@ function updateSale($id) {
             (isset($body['discountAmount']) ? floatval($body['discountAmount']) : null),
         $body['discount_authorized_by'] ?? $body['discountAuthorizedBy'] ?? null,
         $body['discount_partner_name'] ?? $body['discountPartnerName'] ?? null,
-        $body['discount_status'] ?? $body['discountStatus'] ?? null,
-        $id
-    ]);
+        $body['discount_status'] ?? $body['discountStatus'] ?? null
+    ];
+
+    if (isset($body['include_acometida'])) {
+        $fields .= ", include_acometida = ?, acometida_value = ?, acometida_paid = ?";
+        $params[] = $include_acometida;
+        $params[] = $acometida_value;
+        $params[] = $acometida_paid;
+    }
+    
+    // Add missing DB columns gracefully if not exist
+    try { $pdo->exec("ALTER TABLE sales ADD COLUMN commission_paid TINYINT(1) DEFAULT 0"); } catch(Exception $e) {}
+    
+    if (isset($body['commission_paid'])) {
+        $fields .= ", commission_paid = ?";
+        $params[] = $body['commission_paid'] ? 1 : 0;
+    }
+
+    $params[] = $id;
+
+    // Log changes
+    $oldSale = $pdo->prepare("SELECT * FROM sales WHERE id = ?");
+    $oldSale->execute([$id]);
+    $oldData = $oldSale->fetch();
+
+    $stmt = $pdo->prepare("UPDATE sales SET $fields WHERE id = ?");
+    $stmt->execute($params);
+
+    // Audit log
+    global $auth;
+    $userName = 'Unknown';
+    if (isset($auth['sub'])) {
+        $uStmt = $pdo->prepare("SELECT name FROM profiles WHERE id = ?");
+        $uStmt->execute([$auth['sub']]);
+        $uRow = $uStmt->fetch();
+        if ($uRow) $userName = $uRow['name'];
+    }
+    
+    // Compare key fields
+    $trackFields = ['sale_price', 'client_id', 'lot_id', 'payment_type', 'notes', 'commission_agent', 'commission_amount', 'down_payment', 'installments'];
+    if ($oldData) {
+        foreach ($trackFields as $f) {
+            $oldVal = $oldData[$f] ?? '';
+            $newVal = $body[$f] ?? $body[lcfirst(str_replace('_', '', ucwords($f, '_')))] ?? $oldVal;
+            if ((string)$oldVal !== (string)$newVal) {
+                logAudit($auth['sub'] ?? '', $userName, 'update', 'sale', $id, $f, (string)$oldVal, (string)$newVal);
+            }
+        }
+    }
 
     $stmt = $pdo->prepare("SELECT * FROM sales WHERE id = ?");
     $stmt->execute([$id]);
@@ -301,6 +414,17 @@ function deleteSale($id) {
     foreach ($saleLots as $sl) {
         $pdo->prepare("UPDATE lots SET status = 'available' WHERE id = ?")->execute([$sl['lot_id']]);
     }
+
+    // Audit log before delete
+    global $auth;
+    $userName = 'Unknown';
+    if (isset($auth['sub'])) {
+        $uStmt = $pdo->prepare("SELECT name FROM profiles WHERE id = ?");
+        $uStmt->execute([$auth['sub']]);
+        $uRow = $uStmt->fetch();
+        if ($uRow) $userName = $uRow['name'];
+    }
+    logAudit($auth['sub'] ?? '', $userName, 'delete', 'sale', $id, null, null, null, 'Venta eliminada');
 
     $pdo->prepare("DELETE FROM sales WHERE id = ?")->execute([$id]);
     jsonResponse(['data' => ['id' => $id, 'deleted' => true]]);

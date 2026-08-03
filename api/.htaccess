@@ -1,10 +1,23 @@
-# Protect config files
-<FilesMatch "^\.">
-    Order allow,deny
-    Deny from all
-</FilesMatch>
+# API Directory — Sin reescritura (para que los .php se sirvan directamente)
+RewriteEngine Off
 
-<FilesMatch "^(config\.php|jwt\.php)$">
-    Order allow,deny
-    Deny from all
-</FilesMatch>
+
+# CORS headers a nivel Apache (respaldo si mod_headers está disponible)
+<IfModule mod_headers.c>
+    SetEnvIf Origin "^https://loteclick\.com$"        CORS_ORIGIN=$0
+    SetEnvIf Origin "^https://www\.loteclick\.com$"   CORS_ORIGIN=$0
+    SetEnvIf Origin "^http://localhost"                CORS_ORIGIN=$0
+    SetEnvIf Origin "^http://127\.0\.0\.1"             CORS_ORIGIN=$0
+    # Capacitor / App móvil iOS & Android
+    SetEnvIf Origin "^capacitor://localhost$"          CORS_ORIGIN=$0
+    SetEnvIf Origin "^https://localhost$"              CORS_ORIGIN=$0
+    SetEnvIf Origin "^ionic://localhost$"              CORS_ORIGIN=$0
+    SetEnvIf Origin "^https://predioclick$"            CORS_ORIGIN=$0
+    SetEnvIf Origin "^capacitor://predioclick$"        CORS_ORIGIN=$0
+
+    Header always set Access-Control-Allow-Origin     "%{CORS_ORIGIN}e" env=CORS_ORIGIN
+    Header always set Access-Control-Allow-Methods    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers    "Content-Type, Authorization"
+    Header always set Access-Control-Allow-Credentials "true"
+    Header always set Access-Control-Max-Age          "86400"
+</IfModule>

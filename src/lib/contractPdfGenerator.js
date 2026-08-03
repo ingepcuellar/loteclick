@@ -6,6 +6,7 @@
 import jsPDF from 'jspdf';
 import { brand } from '../config/brandConfig';
 import { formatCurrency } from './formatters';
+import { loadLogos, getImageDimensions } from './logoLoader';
 
 // Helpers
 function numberToWords(n) {
@@ -104,7 +105,7 @@ function calculateStartDate(saleDate) {
 /**
  * Main function: Generate the contract PDF
  */
-export function generateContractPDF({ sale, client, project, lot, contractParams, promesaNumber }) {
+export async function generateContractPDF({ sale, client, project, lot, lots, contractParams, promesaNumber }) {
     const doc = new jsPDF('portrait', 'mm', 'letter');
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -112,6 +113,10 @@ export function generateContractPDF({ sale, client, project, lot, contractParams
     const marginRight = 20;
     const contentWidth = pageWidth - marginLeft - marginRight;
     let y = 20;
+
+    // Load logos
+    const projectLogoUrl = project?.logo_url || project?.logoUrl || null;
+    const { brandLogo, projectLogo } = await loadLogos(brand.logo, projectLogoUrl);
 
     const cp = contractParams || {};
     const salePrice = parseFloat(sale.totalPrice || sale.sale_price || 0);
@@ -123,7 +128,9 @@ export function generateContractPDF({ sale, client, project, lot, contractParams
     const penaltyPercent = 20;
     const saleDate = sale.saleDate || sale.sale_date || '';
     const lotNumber = sale.lotNumber || sale.lot_number || '';
-    const lotArea = lot?.area || '___';
+    const lotManzana = sale.lotManzana || sale.lot_manzana || lot?.manzana || '';
+    const lotEtapa = sale.lotEtapaName || sale.lot_etapa_name || '';
+    const lotArea = parseFloat(lot?.area || 0);
     const promNum = String(promesaNumber || 0).padStart(3, '0');
     const clientName = (client?.name || client?.fullName || '').toUpperCase();
     const clientDoc = client?.document || '_______________';
@@ -133,7 +140,25 @@ export function generateContractPDF({ sale, client, project, lot, contractParams
     const vendorPhone = cp.vendor_phone || cp.vendorPhone || '_______________';
     const vendorAddress = cp.vendor_address || cp.vendorAddress || '';
     const matricula = cp.matricula_inmobiliaria || cp.matriculaInmobiliaria || 'M.I. ___________';
-    const porcentaje = cp.porcentaje_cuota || cp.porcentajeCuota || '0.052%';
+
+    // Ítem 8: Multi-lote — sumar áreas de todos los lotes del sale
+    const saleLots = lots && lots.length > 0 ? lots : (lot ? [lot] : []);
+    const totalLotArea = saleLots.reduce((sum, l) => sum + parseFloat(l?.area || 0), 0);
+    const lotAreaDisplay = totalLotArea > 0 ? String(totalLotArea) : (lotArea > 0 ? String(lotArea) : '___');
+
+    // Calcular porcentaje según el área combinada de los lotes del sale vs el total del proyecto
+    const allLots = project?.lots || [];
+    const totalProjectArea = allLots.reduce((sum, l) => sum + parseFloat(l.area || 0), 0);
+    let porcentaje;
+    const effectiveArea = totalLotArea > 0 ? totalLotArea : lotArea;
+    if (effectiveArea > 0 && totalProjectArea > 0) {
+        const pct = (effectiveArea / totalProjectArea) * 100;
+        porcentaje = `${pct.toFixed(4)}%`;
+    } else {
+        // Fallback: usar valor manual de contractParams
+        porcentaje = cp.porcentaje_cuota || cp.porcentajeCuota || '0.052%';
+    }
+
     const ciudad = cp.ciudad || 'Villavicencio - Meta';
     const notaria = cp.notaria_nombre || cp.notariaNombre || '_______________';
     const escrituraFecha = cp.escritura_fecha || cp.escrituraFecha || '';
@@ -143,16 +168,36 @@ export function generateContractPDF({ sale, client, project, lot, contractParams
     const projectLocation = project?.location || ciudad;
 
     // ============ HELPER: Wrapped text ============
-    function addWrappedText(text, x, maxWidth, fontSize, fontStyle = 'normal', lineHeight = 5.5) {
+    function addWrappedText(text, x, maxWidth, fontSize, fontStyle = 'normal', lineHeight = 5.5, justify = true) {
         doc.setFontSize(fontSize);
         doc.setFont('helvetica', fontStyle);
         const lines = doc.splitTextToSize(text, maxWidth);
-        for (const line of lines) {
+        for (let idx = 0; idx < lines.length; idx++) {
             if (y > pageHeight - 25) {
                 doc.addPage();
                 y = 20;
             }
-            doc.text(line, x, y);
+            const line = lines[idx];
+            // Justify all lines except the last one of each paragraph
+            if (justify && idx < lines.length - 1 && line.trim().length > 0) {
+                const words = line.trim().split(' ');
+                if (words.length > 1) {
+                    const textWidth = doc.getTextWidth(line.trim());
+                    const extraSpace = maxWidth - textWidth;
+                    const spacePerGap = extraSpace / (words.length - 1);
+                    
+                    let currentX = x;
+                    const defaultSpaceWidth = doc.getTextWidth(' ');
+                    for (let i = 0; i < words.length; i++) {
+                        doc.text(words[i], currentX, y);
+                        currentX += doc.getTextWidth(words[i]) + defaultSpaceWidth + spacePerGap;
+                    }
+                } else {
+                    doc.text(line, x, y);
+                }
+            } else {
+                doc.text(line, x, y);
+            }
             y += lineHeight;
         }
     }
@@ -169,11 +214,24 @@ export function generateContractPDF({ sale, client, project, lot, contractParams
     }
 
     // ============ PAGE 1: HEADER ============
-    // Logo placeholder bar
+    // Logo bar
     doc.setFillColor(245, 245, 245);
     doc.rect(marginLeft, y - 5, contentWidth, 20, 'F');
     doc.setDrawColor(200, 200, 200);
     doc.rect(marginLeft, y - 5, contentWidth, 20, 'S');
+
+    // Embed brand/project logo
+    const logoToUse = projectLogo || brandLogo;
+    if (logoToUse) {
+        try {
+            const dims = await getImageDimensions(logoToUse);
+            const maxH = 16;
+            const ratio = dims.width / dims.height;
+            const imgH = maxH;
+            const imgW = imgH * ratio;
+            doc.addImage(logoToUse, 'PNG', marginLeft + 2, y - 3, Math.min(imgW, 40), imgH);
+        } catch(e) { /* logo failed, continue without */ }
+    }
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
@@ -235,13 +293,13 @@ export function generateContractPDF({ sale, client, project, lot, contractParams
     // PRIMERA - OBJETO
     addClause(
         'PRIMERA. - OBJETO:',
-        `El promitente Vendedor promete vender al Promitente Comprador y este promete comprar el inmueble rural, que se describe a continuación, en cuotas partes del derecho de dominio, propiedad y posesión real y materia. PARAGRAFO PRIMERO: inmueble identificado con matrícula inmobiliaria No. ${matricula}, cuyos linderos generales aparecen en la escritura pública 1668 de 2010 de la Notaria CUARTA de Villavicencio. PARAGRAFO SEGUNDO: La cuota parte objeto de esta compraventa equivale al ${porcentaje} (correspondiente a una extensión superficiaria de ${lotArea} metros cuadrados). No obstante, la cabida extensión y alindamiento de que habla la cláusula primera de este contrato, la venta se hará como cuerpo cierto y comprenderá todos los derechos, anexidades, dependencias, reformas, adiciones, desenglobes y modificaciones del inmueble objeto del presente contrato. PARAGRAFO TERCERO: El promitente comprador manifiesta conocer las reglamentaciones de urbanismo y del medio ambiente, y todas las demás que le sean aplicables y que hayan sido expedidas por las autoridades correspondientes para el inmueble objeto de esta promesa. Así mismo declara conocer el estado material actual del inmueble el cual es usado, sus áreas y linderos específicos y servidumbres no inscritas, y en tal virtud manifiesta que conoce y acepta la reglamentación vigente en materia de servicios públicos y su disponibilidad, a la cual está sometido el inmueble objeto de la presente promesa de compraventa, así como los usos previstos en los correspondientes reglamentos y normas de urbanismo, en un todo de acuerdo con las previsiones legales y reglamentarias que sean aplicables y renuncia a cualquier proceso de reclamación o indemnización, judicial o extrajudicial ante el promitente vendedor por estos motivos.`
+        `El promitente Vendedor promete vender al Promitente Comprador y este promete comprar el inmueble rural, que se describe a continuación, en cuotas partes del derecho de dominio, propiedad y posesión real y materia. PARAGRAFO PRIMERO: inmueble identificado con matrícula inmobiliaria No. ${matricula}, cuyos linderos generales aparecen en la escritura pública 1668 de 2010 de la Notaria CUARTA de Villavicencio. PARAGRAFO SEGUNDO: La cuota parte objeto de esta compraventa equivale al ${porcentaje} (correspondiente a una extensión superficiaria de ${lotAreaDisplay} metros cuadrados). No obstante, la cabida extensión y alindamiento de que habla la cláusula primera de este contrato, la venta se hará como cuerpo cierto y comprenderá todos los derechos, anexidades, dependencias, reformas, adiciones, desenglobes y modificaciones del inmueble objeto del presente contrato. PARAGRAFO TERCERO: El promitente comprador manifiesta conocer las reglamentaciones de urbanismo y del medio ambiente, y todas las demás que le sean aplicables y que hayan sido expedidas por las autoridades correspondientes para el inmueble objeto de esta promesa. Así mismo declara conocer el estado material actual del inmueble el cual es usado, sus áreas y linderos específicos y servidumbres no inscritas, y en tal virtud manifiesta que conoce y acepta la reglamentación vigente en materia de servicios públicos y su disponibilidad, a la cual está sometido el inmueble objeto de la presente promesa de compraventa, así como los usos previstos en los correspondientes reglamentos y normas de urbanismo, en un todo de acuerdo con las previsiones legales y reglamentarias que sean aplicables y renuncia a cualquier proceso de reclamación o indemnización, judicial o extrajudicial ante el promitente vendedor por estos motivos.`
     );
 
     // SEGUNDA - TÍTULO
     addClause(
         'SEGUNDA. – TÍTULO:',
-        `Por compraventa que le hiciera el señor DAVID SANTIAGO BONILLA FORERO, identificado con CC. 1.122.134.440 de acacias, mediante documento de compraventa otorgado el día 03 de junio de 2025, en la Notaría Cuarta del Círculo de Villavicencio. Y manifiesta que confiere al señor ${vendorName} identificado con C.C: ${vendorDoc} de ${ciudad.split('-')[0]?.trim() || 'Villavicencio'}, el título de propiedad para realizar los respectivos actos de compra y venta del suscrito predio.`
+        tituloPropiedad || `El título de propiedad del predio objeto de esta promesa fue adquirido legalmente y se confiere al señor ${vendorName} identificado con C.C: ${vendorDoc} de ${ciudad.split('-')[0]?.trim() || 'Villavicencio'}, el poder y la autorización para realizar los respectivos actos de compra y venta.`
     );
 
     // TERCERA - POSESIÓN
@@ -417,7 +475,7 @@ export function generateContractPDF({ sale, client, project, lot, contractParams
 
     // Annexe body
     addWrappedText(
-        `Las partes antes referenciadas manifestaron que han CELEBRADO un CONTRATO DE PROMESA DE COMPRAVENTA DE CUOTA PARTE, sobre el bien inmueble allí descrito, equivalente al ${porcentaje} que hace referencia a una extensión superficiaria de ${lotArea} metros cuadrados, allí se prometió en venta del LOTE No.${lotNumber} como consta en el plano topográfico del proyecto "${projectName}".`,
+        `Las partes antes referenciadas manifestaron que han CELEBRADO un CONTRATO DE PROMESA DE COMPRAVENTA DE CUOTA PARTE, sobre el bien inmueble allí descrito, equivalente al ${porcentaje} que hace referencia a una extensión superficiaria de ${lotArea} metros cuadrados, allí se prometió en venta del LOTE No.${lotNumber}${lotManzana ? ` de la Manzana ${lotManzana}` : ''}${lotEtapa ? `, ${lotEtapa}` : ''} como consta en el plano topográfico del proyecto "${projectName}".`,
         marginLeft, contentWidth, 9, 'normal', 5
     );
 

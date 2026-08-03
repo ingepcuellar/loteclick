@@ -4,6 +4,22 @@
  */
 
 /**
+ * Retorna la fecha actual en zona horaria de Bogotá, Colombia (America/Bogota, UTC-5).
+ * Usar en lugar de new Date().toISOString().split('T')[0] para evitar el
+ * desfase de un día cuando en Colombia son más de las 7 PM (ya es el día
+ * siguiente en UTC).
+ * @returns {string} Fecha en formato 'YYYY-MM-DD' según hora de Bogotá
+ */
+export const todayBogota = () => {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Bogota',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(new Date());
+};
+
+/**
  * Format a number as Colombian Peso (COP) currency.
  * @param {number|string} amount - The amount to format
  * @returns {string} Formatted currency string (e.g., "$ 1.500.000")

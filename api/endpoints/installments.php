@@ -108,14 +108,9 @@ function generateInstallments() {
     // Delete existing installments for this sale
     $pdo->prepare("DELETE FROM installments WHERE sale_id = ?")->execute([$saleId]);
 
-    $installmentAmount = round($totalAmount / $numInstallments, 2);
+    $pdo->prepare("DELETE FROM installments WHERE sale_id = ?")->execute([$saleId]);
+
     $installments = [];
-
-    // Calculate the due date for the first regular installment
-    $firstRegularDueDate = date('Y-m-d', strtotime("$startDate +1 months"));
-    // The remaining initial payment is due one day before the first regular installment
-    $remainingInitialDueDate = date('Y-m-d', strtotime("$firstRegularDueDate -1 day"));
-
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare(
@@ -123,71 +118,121 @@ function generateInstallments() {
              VALUES (?, ?, ?, ?, ?, ?, ?)"
         );
 
-        // Installment #-1: Separe (reservation fee) — only if separeAmount > 0
-        if ($separeAmount > 0 && $downPayment > 0) {
-            $separeId = generateUUID();
-            $stmt->execute([$separeId, $saleId, -1, $separeAmount, $startDate, 'pending', 0]);
-            $installments[] = [
-                'id' => $separeId,
-                'sale_id' => $saleId,
-                'installment_number' => -1,
-                'amount' => $separeAmount,
-                'due_date' => $startDate,
-                'status' => 'pending',
-                'paid_amount' => 0
-            ];
+        $customPlan = $body['customPlan'] ?? null;
 
-            // Installment #0: Remaining initial payment (downPayment - separe)
-            $remainingInitial = $downPayment - $separeAmount;
-            if ($remainingInitial > 0) {
-                $downId = generateUUID();
-                $stmt->execute([$downId, $saleId, 0, $remainingInitial, $remainingInitialDueDate, 'pending', 0]);
+        if ($customPlan && is_array($customPlan) && count($customPlan) > 0) {
+            // Use custom variable payment plan from frontend
+            foreach ($customPlan as $inst) {
+                $instId = generateUUID();
+                $stmt->execute([
+                    $instId, 
+                    $saleId, 
+                    intval($inst['installmentNumber'] ?? $inst['installment_number']), 
+                    floatval($inst['amount']), 
+                    $inst['dueDate'] ?? $inst['due_date'], 
+                    'pending', 
+                    0
+                ]);
                 $installments[] = [
-                    'id' => $downId,
+                    'id' => $instId,
                     'sale_id' => $saleId,
-                    'installment_number' => 0,
-                    'amount' => $remainingInitial,
-                    'due_date' => $remainingInitialDueDate,
+                    'installment_number' => intval($inst['installmentNumber'] ?? $inst['installment_number']),
+                    'amount' => floatval($inst['amount']),
+                    'due_date' => $inst['dueDate'] ?? $inst['due_date'],
                     'status' => 'pending',
                     'paid_amount' => 0
                 ];
             }
-        } elseif ($downPayment > 0) {
-            // No separe — full down payment as installment #0 (original behavior)
-            $downId = generateUUID();
-            $stmt->execute([$downId, $saleId, 0, $downPayment, $startDate, 'pending', 0]);
-            $installments[] = [
-                'id' => $downId,
-                'sale_id' => $saleId,
-                'installment_number' => 0,
-                'amount' => $downPayment,
-                'due_date' => $startDate,
-                'status' => 'pending',
-                'paid_amount' => 0
-            ];
-        }
+        } else {
+            // Fallback to standard auto-generation logic
+            $installmentAmount = round($totalAmount / $numInstallments, 2);
 
-        // Regular installments #1 to #N (FIXED — never affected by separe/initial logic)
-        for ($i = 1; $i <= $numInstallments; $i++) {
-            $dueDate = date('Y-m-d', strtotime("$startDate +$i months"));
+            // Determine the anchor date for regular installments:
+            // = the due_date of the initial payment (cuota inicial / down payment)
+            // So Cuota #1 is exactly 1 month after the initial payment due date.
 
-            // Last installment gets the remainder to avoid rounding issues
-            $amount = ($i === $numInstallments)
-                ? round($totalAmount - ($installmentAmount * ($numInstallments - 1)), 2)
-                : $installmentAmount;
+            if ($separeAmount > 0 && $downPayment > 0) {
+                // Separe + Down payment scenario
+                // The down payment (cuota inicial) is due $startDate + 1 month
+                $downPaymentDueDate = date('Y-m-d', strtotime("$startDate +1 months"));
+                // Separe is due on startDate
+                $separeId = generateUUID();
+                $stmt->execute([$separeId, $saleId, -1, $separeAmount, $startDate, 'pending', 0]);
+                $installments[] = [
+                    'id' => $separeId,
+                    'sale_id' => $saleId,
+                    'installment_number' => -1,
+                    'amount' => $separeAmount,
+                    'due_date' => $startDate,
+                    'status' => 'pending',
+                    'paid_amount' => 0
+                ];
 
-            $instId = generateUUID();
-            $stmt->execute([$instId, $saleId, $i, $amount, $dueDate, 'pending', 0]);
+                // Down payment (cuota inicial) = 1 month after sale
+                $remainingInitial = $downPayment - $separeAmount;
+                if ($remainingInitial > 0) {
+                    $downId = generateUUID();
+                    $stmt->execute([$downId, $saleId, 0, $remainingInitial, $downPaymentDueDate, 'pending', 0]);
+                    $installments[] = [
+                        'id' => $downId,
+                        'sale_id' => $saleId,
+                        'installment_number' => 0,
+                        'amount' => $remainingInitial,
+                        'due_date' => $downPaymentDueDate,
+                        'status' => 'pending',
+                        'paid_amount' => 0
+                    ];
+                }
 
-            $installments[] = [
-                'id' => $instId,
-                'sale_id' => $saleId,
-                'installment_number' => $i,
-                'amount' => $amount,
-                'due_date' => $dueDate,
-                'status' => 'pending',
-                'paid_amount' => 0
-            ];
+                // Regular installments anchor = downPaymentDueDate
+                $installmentsAnchor = $downPaymentDueDate;
+
+            } else if ($downPayment > 0) {
+                // Only down payment, no separe
+                // The down payment is due on startDate
+                $downId = generateUUID();
+                $stmt->execute([$downId, $saleId, 0, $downPayment, $startDate, 'pending', 0]);
+                $installments[] = [
+                    'id' => $downId,
+                    'sale_id' => $saleId,
+                    'installment_number' => 0,
+                    'amount' => $downPayment,
+                    'due_date' => $startDate,
+                    'status' => 'pending',
+                    'paid_amount' => 0
+                ];
+
+                // Regular installments start 1 month after down payment
+                $installmentsAnchor = $startDate;
+
+            } else {
+                // No down payment, regular installments start from startDate
+                $installmentsAnchor = $startDate;
+            }
+
+            // Generate regular installments (1 to N) — each 1 month after anchor
+            for ($i = 1; $i <= $numInstallments; $i++) {
+                $instId = generateUUID();
+                $dueDate = date('Y-m-d', strtotime("$installmentsAnchor +$i months"));
+
+                // Ensure the last installment absorbs any rounding differences
+                $amount = $installmentAmount;
+                if ($i === $numInstallments) {
+                    $amount = $totalAmount - ($installmentAmount * ($numInstallments - 1));
+                }
+
+                $stmt->execute([$instId, $saleId, $i, $amount, $dueDate, 'pending', 0]);
+
+                $installments[] = [
+                    'id' => $instId,
+                    'sale_id' => $saleId,
+                    'installment_number' => $i,
+                    'amount' => $amount,
+                    'due_date' => $dueDate,
+                    'status' => 'pending',
+                    'paid_amount' => 0
+                ];
+            }
         }
 
         $pdo->commit();

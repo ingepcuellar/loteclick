@@ -33,6 +33,7 @@ function UtilityList() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
+    const [filterProject, setFilterProject] = useState(''); // Ítem 20
     const [showFilters, setShowFilters] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -45,6 +46,10 @@ function UtilityList() {
         if (filterStatus) {
             items = items.filter(u => u.status === filterStatus);
         }
+        // Ítem 20: filtro por proyecto
+        if (filterProject) {
+            items = items.filter(u => (u.projectId || u.project_id) === filterProject);
+        }
         if (searchTerm) {
             const search = searchTerm.toLowerCase();
             items = items.filter(u =>
@@ -55,7 +60,7 @@ function UtilityList() {
         }
 
         return items;
-    }, [state.utilityRegistrations, filterType, filterStatus, searchTerm]);
+    }, [state.utilityRegistrations, filterType, filterStatus, filterProject, searchTerm]);
 
     const stats = useMemo(() => {
         const all = state.utilityRegistrations || [];
@@ -176,6 +181,27 @@ function UtilityList() {
                                     <option value="paid">Pagado</option>
                                 </select>
                             </div>
+                            {/* Ítem 20: filtro por proyecto */}
+                            <div className="form-group" style={{ flex: 1, minWidth: '200px', marginBottom: 0 }}>
+                                <label className="form-label">Proyecto</label>
+                                <select
+                                    className="form-control"
+                                    value={filterProject}
+                                    onChange={(e) => setFilterProject(e.target.value)}
+                                >
+                                    <option value="">Todos los proyectos</option>
+                                    {state.projects?.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {(filterType || filterStatus || filterProject) && (
+                                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                    <button className="btn btn-ghost" onClick={() => { setFilterType(''); setFilterStatus(''); setFilterProject(''); }}>
+                                        Limpiar
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

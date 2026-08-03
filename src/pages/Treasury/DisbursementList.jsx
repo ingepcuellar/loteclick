@@ -11,21 +11,27 @@ import {
     FiTrash2,
     FiEye,
     FiImage,
-    FiDownload
+    FiDownload,
+    FiCheck,
+    FiClock
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { disbursementService } from '../../services/disbursementService';
-import { formatCurrency } from '../../lib/formatters';
+import { formatCurrency, formatDate } from '../../lib/formatters';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 
 function DisbursementList() {
     const navigate = useNavigate();
     const { state } = useApp();
+    const { currentUser, isPartner, isAdmin } = useAuth();
     const projects = state.projects || [];
     const [disbursements, setDisbursements] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterProject, setFilterProject] = useState('');
+    const [filterPartner, setFilterPartner] = useState(''); // Ítem 18
+    const [filterMonth, setFilterMonth] = useState('');   // Ítem 18 (YYYY-MM)
     const [showImageModal, setShowImageModal] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
     const [selectedImageTitle, setSelectedImageTitle] = useState('');
@@ -63,14 +69,25 @@ function DisbursementList() {
         setShowImageModal(true);
     };
 
-
+    // Ítem 1: Socio acepta entrega
+    const handleAccept = async (id) => {
+        const { data, error } = await disbursementService.accept(id);
+        if (!error && data) {
+            setDisbursements(prev => prev.map(d => d.id === id ? { ...d, status: 'accepted' } : d));
+        } else {
+            alert(error || 'No se pudo aceptar la entrega');
+        }
+    };
 
     const filteredDisbursements = disbursements.filter(d => {
         const matchesSearch = !searchTerm ||
             (d.partner?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (d.notes || '').toLowerCase().includes(searchTerm.toLowerCase());
         const matchesProject = !filterProject || d.project_id === filterProject;
-        return matchesSearch && matchesProject;
+        // Ítem 18: filtros adicionales
+        const matchesPartner = !filterPartner || d.partner_id === filterPartner;
+        const matchesMonth = !filterMonth || (d.disbursement_date || '').startsWith(filterMonth);
+        return matchesSearch && matchesProject && matchesPartner && matchesMonth;
     });
 
     const totalDisbursed = filteredDisbursements.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0);
@@ -125,13 +142,43 @@ function DisbursementList() {
                     value={filterProject}
                     onChange={(e) => setFilterProject(e.target.value)}
                     className="form-control"
-                    style={{ maxWidth: '250px' }}
+                    style={{ maxWidth: '200px' }}
                 >
                     <option value="">Todos los proyectos</option>
                     {projects.map(p => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                 </select>
+                {/* Ítem 18: filtro por socio */}
+                <select
+                    value={filterPartner}
+                    onChange={(e) => setFilterPartner(e.target.value)}
+                    className="form-control"
+                    style={{ maxWidth: '200px' }}
+                >
+                    <option value="">Todos los socios</option>
+                    {[...new Map(disbursements
+                        .filter(d => d.partner_id && d.partner?.name)
+                        .map(d => [d.partner_id, d.partner?.name])
+                    ).entries()].map(([id, name]) => (
+                        <option key={id} value={id}>{name}</option>
+                    ))}
+                </select>
+                {/* Ítem 18: filtro por mes */}
+                <input
+                    type="month"
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(e.target.value)}
+                    className="form-control"
+                    style={{ maxWidth: '160px' }}
+                    title="Filtrar por mes"
+                />
+                {(filterProject || filterPartner || filterMonth || searchTerm) && (
+                    <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => { setFilterProject(''); setFilterPartner(''); setFilterMonth(''); setSearchTerm(''); }}
+                    >Limpiar</button>
+                )}
             </div>
 
             {/* Table */}
@@ -154,6 +201,8 @@ function DisbursementList() {
                                     <th>Socio</th>
                                     <th>Proyecto</th>
                                     <th>Monto</th>
+                                    <th>Modalidad</th>
+                                    <th>Estado</th>
                                     <th>Comprobante</th>
                                     <th>Acciones</th>
                                 </tr>
@@ -163,7 +212,7 @@ function DisbursementList() {
                                     <tr key={d.id}>
                                         <td>
                                             <FiCalendar style={{ marginRight: '0.5rem' }} />
-                                            {new Date(d.disbursement_date).toLocaleDateString('es-CO')}
+                                            {formatDate(d.disbursement_date)}
                                         </td>
                                         <td>
                                             <FiUser style={{ marginRight: '0.5rem' }} />
@@ -177,6 +226,25 @@ function DisbursementList() {
                                             {formatCurrency(d.amount)}
                                         </td>
                                         <td>
+                                            {(() => {
+                                                const m = d.payment_method || 'cash';
+                                                if (m === 'transfer') return <span className="badge badge-info">🏦 Transferencia</span>;
+                                                if (m === 'check')    return <span className="badge badge-warning">📋 Cheque</span>;
+                                                return <span className="badge" style={{ background: 'rgba(34,197,94,0.15)', color: '#16a34a' }}>💵 Efectivo</span>;
+                                            })()}
+                                        </td>
+                                        <td>
+                                            {(d.status === 'accepted') ? (
+                                                <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <FiCheck size={11} /> Aceptado
+                                                </span>
+                                            ) : (
+                                                <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <FiClock size={11} /> Pendiente
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td>
                                             {(d.receipt_image || d.signature_image) ? (
                                                 <span className="badge badge-success">
                                                     <FiImage /> Sí
@@ -187,6 +255,16 @@ function DisbursementList() {
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                {/* Ítem 1: Botón Aceptar solo para el socio receptor */}
+                                                {!isAdmin() && isPartner() && (d.status || 'pending') !== 'accepted' && (
+                                                    <button
+                                                        onClick={() => handleAccept(d.id)}
+                                                        className="btn btn-sm btn-success"
+                                                        title="Aceptar esta entrega"
+                                                    >
+                                                        <FiCheck /> Aceptar
+                                                    </button>
+                                                )}
                                                 {d.receipt_image && (
                                                     <button onClick={() => openImageModal(d.receipt_image, `Recibo - ${d.partner?.name}`)} className="btn btn-sm btn-outline">
                                                         <FiEye /> Recibo
@@ -229,7 +307,7 @@ function DisbursementList() {
                                 <div className="mobile-card-body">
                                     <div className="mobile-card-row">
                                         <span className="mobile-card-label">Fecha</span>
-                                        <span className="mobile-card-value">{new Date(d.disbursement_date).toLocaleDateString('es-CO')}</span>
+                                        <span className="mobile-card-value">{formatDate(d.disbursement_date)}</span>
                                     </div>
                                     <div className="mobile-card-row">
                                         <span className="mobile-card-label">Comprobante</span>

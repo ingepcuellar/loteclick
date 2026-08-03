@@ -8,6 +8,8 @@ import {
     FiWind
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { todayBogota } from '../../lib/formatters';
+import CurrencyInput from '../../components/ui/CurrencyInput';
 
 function UtilityForm() {
     const navigate = useNavigate();
@@ -21,7 +23,7 @@ function UtilityForm() {
         serviceType: 'water',
         amount: '',
         status: 'pending',
-        chargeDate: new Date().toISOString().split('T')[0],
+        chargeDate: todayBogota(),
         paidDate: '',
         notes: '',
     });
@@ -172,15 +174,12 @@ function UtilityForm() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                             <div className="form-group">
                                 <label className="form-label required">Monto</label>
-                                <input
-                                    type="number"
+                                <CurrencyInput
                                     name="amount"
                                     className={`form-control ${errors.amount ? 'error' : ''}`}
                                     value={formData.amount}
                                     onChange={handleChange}
                                     placeholder="0"
-                                    min="0"
-                                    step="any"
                                 />
                                 {errors.amount && <span className="form-error">{errors.amount}</span>}
                             </div>

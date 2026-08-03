@@ -1,7 +1,7 @@
 -- =============================================
 -- J.V.J Constructores Inmobiliarios S.A.S
 -- Schema Completo - Base de datos NUEVA desde cero
--- Incluye: schema base + migrations v2-v7 + device_tokens
+-- Incluye: schema base + migrations v2-v8 + device_tokens
 -- =============================================
 
 -- ─── PROFILES (Usuarios) ─────────────────────────────────────────
@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS projects (
     name VARCHAR(255) NOT NULL,
     location VARCHAR(500) NOT NULL,
     description TEXT,
+    block_type ENUM('manzana','etapa') DEFAULT NULL COMMENT 'Tipo de agrupación de lotes',
     created_by CHAR(36),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -45,13 +46,14 @@ CREATE TABLE IF NOT EXISTS partners (
 CREATE TABLE IF NOT EXISTS lots (
     id CHAR(36) PRIMARY KEY,
     project_id CHAR(36) NOT NULL,
-    number INT NOT NULL,
+    number VARCHAR(50) NOT NULL,
+    manzana VARCHAR(50) DEFAULT NULL COMMENT 'Identificador de manzana o etapa (A, B, 1, 2...)',
     area DECIMAL(10,2),
     price DECIMAL(15,2),
     status ENUM('available', 'reserved', 'sold', 'pending_initial') DEFAULT 'available',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_lot_project (project_id, number),
+    UNIQUE KEY uk_lot_project_manzana (project_id, number, manzana),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -253,6 +255,29 @@ CREATE TABLE IF NOT EXISTS device_tokens (
     FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ─── DESISTIMIENTOS (Cancelaciones de Venta) ────────────────────
+CREATE TABLE IF NOT EXISTS desistimientos (
+    id CHAR(36) PRIMARY KEY,
+    sale_id CHAR(36) NOT NULL COMMENT 'ID de la venta original (ya eliminada)',
+    project_id CHAR(36) NOT NULL,
+    lot_id CHAR(36) NOT NULL,
+    lot_number INT NOT NULL,
+    client_id CHAR(36) NOT NULL,
+    client_name VARCHAR(255) NOT NULL,
+    client_document VARCHAR(100),
+    client_phone VARCHAR(50),
+    project_name VARCHAR(255) NOT NULL,
+    sale_price DECIMAL(15,2) NOT NULL COMMENT 'Precio original de venta',
+    total_paid DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT 'Total que habia pagado el cliente',
+    amount_retained DECIMAL(15,2) NOT NULL COMMENT 'Monto que retiene la empresa (configurable)',
+    desistimiento_date DATE NOT NULL,
+    reason TEXT COMMENT 'Motivo del desistimiento',
+    notes TEXT,
+    registered_by CHAR(36),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (registered_by) REFERENCES profiles(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ─── INDEXES ─────────────────────────────────────────────────────
 CREATE INDEX idx_partners_project ON partners(project_id);
 CREATE INDEX idx_lots_project ON lots(project_id);
@@ -270,6 +295,9 @@ CREATE INDEX idx_utility_sale ON utility_registrations(sale_id);
 CREATE INDEX idx_utility_status ON utility_registrations(status);
 CREATE INDEX idx_utility_type ON utility_registrations(service_type);
 CREATE INDEX idx_device_tokens_user ON device_tokens(user_id);
+CREATE INDEX idx_desistimientos_project ON desistimientos(project_id);
+CREATE INDEX idx_desistimientos_client ON desistimientos(client_id);
+CREATE INDEX idx_desistimientos_date ON desistimientos(desistimiento_date);
 
 -- ─── USUARIO ADMIN POR DEFECTO ──────────────────────────────────
 -- Contraseña: admin123 (bcrypt hash)

@@ -24,6 +24,7 @@ function ClientDetail() {
 
     const client = getClientById(id);
     const clientSales = getSalesByClient(id);
+    const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
     if (state.isLoading) {
         return (
@@ -50,7 +51,6 @@ function ClientDetail() {
         );
     }
 
-    const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
     const handleDelete = () => {
         if (clientSales.length > 0) {

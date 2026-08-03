@@ -37,17 +37,34 @@ switch ($action) {
  */
 function getContractParams() {
     $pdo = getConnection();
+
+    // Auto-migration: add new columns if they don't exist yet
+    $newColumns = [
+        "ALTER TABLE contract_params ADD COLUMN empresa_nombre VARCHAR(255) NOT NULL DEFAULT ''",
+        "ALTER TABLE contract_params ADD COLUMN empresa_nit VARCHAR(50) NOT NULL DEFAULT ''",
+        "ALTER TABLE contract_params ADD COLUMN vendor_ciudad_cc VARCHAR(100) NOT NULL DEFAULT ''",
+        "ALTER TABLE contract_params ADD COLUMN vendor_email VARCHAR(255) NOT NULL DEFAULT ''",
+        "ALTER TABLE contract_params ADD COLUMN numero_cuenta VARCHAR(100) NOT NULL DEFAULT ''",
+    ];
+    foreach ($newColumns as $sql) {
+        try { $pdo->exec($sql); } catch (\Exception $e) { /* column already exists */ }
+    }
+
     $stmt = $pdo->query("SELECT * FROM contract_params LIMIT 1");
     $params = $stmt->fetch();
 
     if (!$params) {
-        // Return empty defaults
         jsonResponse(['data' => [
             'id' => null,
             'vendor_name' => '',
             'vendor_document' => '',
             'vendor_phone' => '',
             'vendor_address' => '',
+            'vendor_ciudad_cc' => '',
+            'vendor_email' => '',
+            'empresa_nombre' => '',
+            'empresa_nit' => '',
+            'numero_cuenta' => '',
             'matricula_inmobiliaria' => '',
             'porcentaje_cuota' => '0.052%',
             'ciudad' => 'Villavicencio - Meta',
@@ -56,7 +73,8 @@ function getContractParams() {
             'escritura_fecha' => null,
             'escritura_hora' => '03:00 PM',
             'titulo_propiedad' => '',
-            'ultimo_numero_promesa' => 0
+            'ultimo_numero_promesa' => 0,
+            'initial_payment_pct' => 20
         ]]);
         return;
     }
@@ -82,9 +100,11 @@ function upsertContractParams() {
 
         $allowed = [
             'vendor_name', 'vendor_document', 'vendor_phone', 'vendor_address',
+            'vendor_ciudad_cc', 'vendor_email',
+            'empresa_nombre', 'empresa_nit', 'numero_cuenta',
             'matricula_inmobiliaria', 'porcentaje_cuota', 'ciudad',
             'notaria_nombre', 'notaria_ciudad', 'escritura_fecha', 'escritura_hora',
-            'titulo_propiedad', 'ultimo_numero_promesa'
+            'titulo_propiedad', 'ultimo_numero_promesa', 'initial_payment_pct'
         ];
 
         // Also accept camelCase keys
@@ -93,6 +113,11 @@ function upsertContractParams() {
             'vendorDocument' => 'vendor_document',
             'vendorPhone' => 'vendor_phone',
             'vendorAddress' => 'vendor_address',
+            'vendorCiudadCC' => 'vendor_ciudad_cc',
+            'vendorEmail' => 'vendor_email',
+            'empresaNombre' => 'empresa_nombre',
+            'empresaNit' => 'empresa_nit',
+            'numeroCuenta' => 'numero_cuenta',
             'matriculaInmobiliaria' => 'matricula_inmobiliaria',
             'porcentajeCuota' => 'porcentaje_cuota',
             'notariaNombre' => 'notaria_nombre',
@@ -100,7 +125,8 @@ function upsertContractParams() {
             'escrituraFecha' => 'escritura_fecha',
             'escrituraHora' => 'escritura_hora',
             'tituloPropiedad' => 'titulo_propiedad',
-            'ultimoNumeroPromesa' => 'ultimo_numero_promesa'
+            'ultimoNumeroPromesa' => 'ultimo_numero_promesa',
+            'initialPaymentPct' => 'initial_payment_pct'
         ];
 
         // Normalize camelCase to snake_case
@@ -140,16 +166,22 @@ function upsertContractParams() {
 
         $pdo->prepare(
             "INSERT INTO contract_params (id, vendor_name, vendor_document, vendor_phone, vendor_address,
+             vendor_ciudad_cc, vendor_email, empresa_nombre, empresa_nit, numero_cuenta,
              matricula_inmobiliaria, porcentaje_cuota, ciudad,
              notaria_nombre, notaria_ciudad, escritura_fecha, escritura_hora,
-             titulo_propiedad, ultimo_numero_promesa)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             titulo_propiedad, ultimo_numero_promesa, initial_payment_pct)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )->execute([
             $id,
             $body['vendor_name'] ?? $body['vendorName'] ?? '',
             $body['vendor_document'] ?? $body['vendorDocument'] ?? '',
             $body['vendor_phone'] ?? $body['vendorPhone'] ?? '',
             $body['vendor_address'] ?? $body['vendorAddress'] ?? '',
+            $body['vendor_ciudad_cc'] ?? $body['vendorCiudadCC'] ?? '',
+            $body['vendor_email'] ?? $body['vendorEmail'] ?? '',
+            $body['empresa_nombre'] ?? $body['empresaNombre'] ?? '',
+            $body['empresa_nit'] ?? $body['empresaNit'] ?? '',
+            $body['numero_cuenta'] ?? $body['numeroCuenta'] ?? '',
             $body['matricula_inmobiliaria'] ?? $body['matriculaInmobiliaria'] ?? '',
             $body['porcentaje_cuota'] ?? $body['porcentajeCuota'] ?? '0.052%',
             $body['ciudad'] ?? 'Villavicencio - Meta',
@@ -158,7 +190,8 @@ function upsertContractParams() {
             !empty($body['escritura_fecha'] ?? $body['escrituraFecha'] ?? '') ? ($body['escritura_fecha'] ?? $body['escrituraFecha']) : null,
             $body['escritura_hora'] ?? $body['escrituraHora'] ?? '03:00 PM',
             $body['titulo_propiedad'] ?? $body['tituloPropiedad'] ?? '',
-            intval($body['ultimo_numero_promesa'] ?? $body['ultimoNumeroPromesa'] ?? 0)
+            intval($body['ultimo_numero_promesa'] ?? $body['ultimoNumeroPromesa'] ?? 0),
+            floatval($body['initial_payment_pct'] ?? $body['initialPaymentPct'] ?? 20)
         ]);
 
         $stmt = $pdo->prepare("SELECT * FROM contract_params WHERE id = ?");

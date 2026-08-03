@@ -12,12 +12,16 @@ import {
     FiArrowLeft,
     FiUpload,
     FiGrid,
-    FiAlertCircle
+    FiAlertCircle,
+    FiCreditCard
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
 import { storageService } from '../../services/storageService';
 import { pickImage } from '../../lib/cameraUtils';
-import { formatCurrency } from '../../lib/formatters';
+import { formatCurrency, todayBogota } from '../../lib/formatters';
+import CurrencyInput from '../../components/ui/CurrencyInput';
+import { expenseService } from '../../services/expenseService';
+import { bankAccountService } from '../../services/bankAccountService';
 
 const EXPENSE_CATEGORIES = [
     {
@@ -25,6 +29,7 @@ const EXPENSE_CATEGORIES = [
             { value: 'commissions', label: 'Comisiones', description: 'Pagos a comisionistas' },
             { value: 'signatures', label: 'Firmas y Escrituras', description: 'Escrituras, firmas notariales' },
             { value: 'construction', label: 'Obras', description: 'Construcción, materiales, mano de obra' },
+            { value: 'desistimientos', label: 'Desistimientos', description: 'Devoluciones por ventas caídas' },
         ]
     },
     {
@@ -65,15 +70,20 @@ function ExpenseForm() {
         projectId: '',
         partnerId: '',
         category: 'other',
-        date: new Date().toISOString().split('T')[0],
+        date: todayBogota(),
         notes: '',
         selectedLots: [],
+        paymentMethod: 'cash',
+        bankAccountId: '',
     });
 
     const [errors, setErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
     const [attachmentFile, setAttachmentFile] = useState(null);
     const [attachmentPreview, setAttachmentPreview] = useState(null);
+    const [pendingCommissions, setPendingCommissions] = useState([]);
+    const [selectedCommissionId, setSelectedCommissionId] = useState('');
+    const [bankAccounts, setBankAccounts] = useState([]);
 
     // Whether category is "signatures" (Firmas y Escrituras)
     const isSignatures = formData.category === 'signatures';
@@ -89,9 +99,11 @@ function ExpenseForm() {
                     projectId: expense.projectId || '',
                     partnerId: expense.partnerId || '',
                     category: expense.category || 'other',
-                    date: expense.date || new Date().toISOString().split('T')[0],
+                    date: expense.date || todayBogota(),
                     notes: expense.notes || '',
                     selectedLots: expense.selectedLots || [],
+                    paymentMethod: expense.paymentMethod || expense.payment_method || 'cash',
+                    bankAccountId: expense.bankAccountId || expense.bank_account_id || '',
                 });
                 // Show existing attachment preview
                 if (expense.attachment) {
@@ -103,13 +115,25 @@ function ExpenseForm() {
         }
     }, [id, isEditing, getExpenseById, navigate]);
 
+    // Load pending commissions and bank accounts
+    useEffect(() => {
+        if (!isEditing) {
+            expenseService.getPendingCommissions().then(({ data }) => {
+                if (data) setPendingCommissions(data);
+            }).catch(console.error);
+        }
+        bankAccountService.getAll().then(({ data }) => {
+            if (data) setBankAccounts(data);
+        }).catch(console.error);
+    }, [isEditing]);
+
     // Get partners from selected project
     const selectedProject = formData.projectId ? getProjectById(formData.projectId) : null;
     const projectPartners = selectedProject?.partners || [];
 
     // Get sold lots for the selected project (for signatures multi-select)
     const projectLots = selectedProject?.lots || [];
-    const soldLots = projectLots.filter(l => l.status === 'sold');
+    const soldLots = projectLots.filter(l => l.status === 'sold' || l.status === 'pending_initial');
 
     // Auto-fill description when category changes to "signatures"
     useEffect(() => {
@@ -151,6 +175,31 @@ function ExpenseForm() {
                 ...prev,
                 [name]: null
             }));
+        }
+    };
+
+    const handleCommissionSelect = (e) => {
+        const saleId = e.target.value;
+        setSelectedCommissionId(saleId);
+        
+        if (saleId) {
+            const comm = pendingCommissions.find(c => c.sale_id === saleId);
+            if (comm) {
+                const total = parseFloat(comm.commission_amount);
+                const paid = parseFloat(comm.commission_paid_amount || 0);
+                const pending = total - paid;
+                
+                setFormData(prev => ({
+                    ...prev,
+                    projectId: comm.project_id,
+                    amount: pending.toString(),
+                    description: `PAGO DE COMISION - ${comm.commission_agent || 'AGENTE'} - LOTE ${comm.lot_number}`,
+                }));
+                // Clear errors
+                setErrors(prev => ({ ...prev, projectId: null, amount: null, description: null }));
+            }
+        } else {
+            setFormData(prev => ({ ...prev, projectId: '', amount: '', description: '' }));
         }
     };
 
@@ -197,8 +246,19 @@ function ExpenseForm() {
             newErrors.description = 'La descripción es requerida';
         }
 
-        if (!formData.amount || parseFloat(formData.amount) <= 0) {
+        const numericAmount = parseFloat(formData.amount);
+        if (!formData.amount || isNaN(numericAmount) || numericAmount <= 0) {
             newErrors.amount = 'El monto debe ser mayor a 0';
+        } else if (formData.category === 'commissions' && selectedCommissionId) {
+            const comm = pendingCommissions.find(c => c.sale_id === selectedCommissionId);
+            if (comm) {
+                const total = parseFloat(comm.commission_amount);
+                const paid = parseFloat(comm.commission_paid_amount || 0);
+                const pending = total - paid;
+                if (numericAmount > pending) {
+                    newErrors.amount = `El abono no puede superar el saldo pendiente de $${pending.toLocaleString('es-CO')}`;
+                }
+            }
         }
 
         if (!formData.projectId) {
@@ -215,6 +275,10 @@ function ExpenseForm() {
 
         if (isSignatures && formData.selectedLots.length === 0) {
             newErrors.selectedLots = 'Selecciona al menos un lote para registrar la escritura';
+        }
+
+        if (formData.paymentMethod === 'transfer' && !formData.bankAccountId) {
+            newErrors.bankAccountId = 'Selecciona una cuenta bancaria';
         }
 
         setErrors(newErrors);
@@ -242,6 +306,9 @@ function ExpenseForm() {
                 amount: parseFloat(formData.amount),
                 attachment: attachmentUrl,
                 selectedLots: isSignatures ? formData.selectedLots : null,
+                sale_id: formData.category === 'commissions' ? selectedCommissionId : null,
+                bank_account_id: formData.paymentMethod === 'transfer' ? formData.bankAccountId : null,
+                payment_method: formData.paymentMethod,
             };
 
             if (isEditing) {
@@ -329,6 +396,66 @@ function ExpenseForm() {
                             </div>
                         </div>
 
+                        {/* Pending Commissions — Grid de tarjetas (no dropdown) */}
+                        {formData.category === 'commissions' && !isEditing && (
+                            <div className="form-group" style={{ marginBottom: '1rem', padding: '1rem', background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: 'var(--radius-md)' }}>
+                                <label className="form-label">
+                                    <FiAlertCircle style={{ marginRight: '0.5rem', color: 'var(--primary-color)' }} />
+                                    Selecciona la comisión a pagar
+                                </label>
+                                {pendingCommissions.length === 0 ? (
+                                    <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', margin: 0 }}>
+                                        No hay comisiones pendientes de pago.
+                                    </p>
+                                ) : (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                        {pendingCommissions.map(comm => {
+                                            const pending = parseFloat(comm.commission_amount) - parseFloat(comm.commission_paid_amount || 0);
+                                            const isSelected = selectedCommissionId === comm.sale_id;
+                                            return (
+                                                <div
+                                                    key={comm.sale_id}
+                                                    onClick={() => handleCommissionSelect({ target: { value: isSelected ? '' : comm.sale_id } })}
+                                                    style={{
+                                                        padding: '0.85rem 1rem',
+                                                        borderRadius: 'var(--radius-lg)',
+                                                        border: `2px solid ${isSelected ? '#6366f1' : 'var(--border-color)'}`,
+                                                        background: isSelected ? 'rgba(99,102,241,0.10)' : 'var(--bg-secondary)',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.18s ease',
+                                                        boxShadow: isSelected ? '0 0 0 3px rgba(99,102,241,0.15)' : 'none',
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                                                        <div style={{ fontWeight: '700', fontSize: 'var(--font-size-sm)', color: isSelected ? '#6366f1' : 'var(--text-primary)' }}>
+                                                            {comm.commission_agent || 'Agente'}
+                                                        </div>
+                                                        {isSelected && (
+                                                            <span style={{ background: '#6366f1', color: '#fff', borderRadius: '999px', fontSize: '0.7rem', padding: '1px 8px', fontWeight: '600' }}>Seleccionado</span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                                                        {comm.project_name} • Lote #{comm.lot_number}
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>Pendiente:</span>
+                                                        <span style={{ fontWeight: '700', color: '#ef4444', fontSize: 'var(--font-size-sm)' }}>
+                                                            {formatCurrency(pending)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {selectedCommissionId && (
+                                    <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                        Puede modificar el monto a pagar si se trata de un abono parcial.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         <div className="form-row">
                             <div className="form-group" style={{ flex: 2 }}>
                                 <label className="form-label">
@@ -358,17 +485,49 @@ function ExpenseForm() {
                                     <FiDollarSign style={{ marginRight: '0.5rem' }} />
                                     Monto *
                                 </label>
-                                <input
-                                    type="number"
+                                <CurrencyInput
                                     name="amount"
                                     className={`form-control ${errors.amount ? 'error' : ''}`}
                                     value={formData.amount}
                                     onChange={handleChange}
                                     placeholder="0"
-                                    min="0"
-                                    step="1000"
                                 />
                                 {errors.amount && <span className="form-error">{errors.amount}</span>}
+                            </div>
+
+                            <div className="form-group" style={{ flex: 1 }}>
+                                <label className="form-label">
+                                    <FiCreditCard style={{ marginRight: '0.5rem' }} />
+                                    Método de Pago *
+                                </label>
+                                <select
+                                    name="paymentMethod"
+                                    className="form-control"
+                                    value={formData.paymentMethod}
+                                    onChange={handleChange}
+                                >
+                                    <option value="cash">Efectivo</option>
+                                    <option value="transfer">Transferencia</option>
+                                    <option value="barter">Permuta</option>
+                                </select>
+                                {formData.paymentMethod === 'transfer' && (
+                                    <div style={{ marginTop: '0.75rem' }}>
+                                        <select
+                                            name="bankAccountId"
+                                            className={`form-control ${errors.bankAccountId ? 'error' : ''}`}
+                                            value={formData.bankAccountId}
+                                            onChange={handleChange}
+                                        >
+                                            <option value="">-- Seleccionar Cuenta --</option>
+                                            {bankAccounts.map(b => (
+                                                <option key={b.id} value={b.id}>
+                                                    {b.bank_name} - {b.account_number}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.bankAccountId && <span className="form-error">{errors.bankAccountId}</span>}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

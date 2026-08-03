@@ -81,20 +81,13 @@ function UserForm() {
         setFormData(prev => {
             let newRoles;
 
-            // Admin and Partner are exclusive — selecting one clears others
-            if (role === ROLES.ADMIN || role === ROLES.PARTNER) {
-                newRoles = prev.roles.includes(role) ? [ROLES.SELLER] : [role];
+            if (prev.roles.includes(role)) {
+                // Deselect — but always keep at least one role
+                newRoles = prev.roles.filter(r => r !== role);
+                if (newRoles.length === 0) newRoles = [ROLES.SELLER];
             } else {
-                // For seller/treasurer, toggle individually
-                if (prev.roles.includes(role)) {
-                    // Don't allow removing the last role
-                    newRoles = prev.roles.filter(r => r !== role);
-                    if (newRoles.length === 0) newRoles = [ROLES.SELLER];
-                } else {
-                    // Remove admin/partner if present, add the new role
-                    newRoles = prev.roles.filter(r => r !== ROLES.ADMIN && r !== ROLES.PARTNER);
-                    newRoles.push(role);
-                }
+                // Select — all roles can be combined freely
+                newRoles = [...prev.roles, role];
             }
 
             return { ...prev, roles: newRoles };
@@ -213,6 +206,7 @@ function UserForm() {
         { key: ROLES.SELLER, label: ROLE_LABELS.seller, icon: ROLE_ICONS.seller, desc: 'Gestiona clientes, ventas y pagos.' },
         { key: ROLES.TREASURER, label: ROLE_LABELS.treasurer, icon: ROLE_ICONS.treasurer, desc: 'Gestiona pagos, gastos y entregas a socios.' },
         { key: ROLES.PARTNER, label: ROLE_LABELS.partner, icon: ROLE_ICONS.partner, desc: 'Solo ve los proyectos asociados.' },
+        { key: ROLES.PARTNER_SECONDARY, label: ROLE_LABELS.partner_secondary, icon: ROLE_ICONS.partner_secondary, desc: 'Ítem 15: Solo consulta — ve su información pero no puede crear ni editar.' }, // Ítem 15
     ];
 
     return (
@@ -411,8 +405,8 @@ function UserForm() {
                             </div>
                         </div>
 
-                        {/* Partner Projects */}
-                        {formData.roles.includes(ROLES.PARTNER) && (
+                        {/* Ítem 16: Proyectos Asociados solo en modo edición */}
+                        {isEditing && formData.roles.some(r => r === ROLES.PARTNER || r === ROLES.PARTNER_SECONDARY) && (
                             <div className="form-group" style={{ marginTop: '1.5rem' }}>
                                 <label className="form-label">
                                     <FiFolder style={{ marginRight: '0.5rem' }} />

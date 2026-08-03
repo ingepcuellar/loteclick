@@ -63,6 +63,22 @@ function Dashboard() {
         api.post('endpoints/check-overdue.php').catch(() => { });
     }, []);
 
+    // Pending acometida alerts
+    const pendingAcometidas = useMemo(() => {
+        return state.sales
+            .filter(s => (s.includeAcometida || s.include_acometida) && !(s.acometidaPaid || s.acometida_paid))
+            .map(sale => {
+                const client = state.clients.find(c => c.id === sale.clientId);
+                const project = state.projects.find(p => p.id === sale.projectId);
+                return {
+                    ...sale,
+                    clientName: client?.name || client?.fullName || 'Cliente',
+                    projectName: project?.name || 'Proyecto',
+                    acometidaValue: parseFloat(sale.acometidaValue || sale.acometida_value || 0)
+                };
+            });
+    }, [state.sales, state.clients, state.projects]);
+
     // Chart data: monthly revenue (last 6 months)
     const monthlyData = useMemo(() => {
         const months = [];
@@ -267,6 +283,50 @@ function Dashboard() {
                 </div>
             </div>
 
+            {/* Pending Acometida Alerts */}
+            {pendingAcometidas.length > 0 && (
+                <div className="card mb-6" style={{ borderLeft: '4px solid #f59e0b' }}>
+                    <div className="card-header">
+                        <h3 className="card-title" style={{ color: '#f59e0b' }}>
+                            <FiAlertTriangle className="card-title-icon" />
+                            🔧 Acometidas Pendientes de Pago ({pendingAcometidas.length})
+                        </h3>
+                    </div>
+                    <div className="card-body">
+                        <div className="table-container">
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        <th>Cliente</th>
+                                        <th>Proyecto</th>
+                                        <th>Lote</th>
+                                        <th>Valor Acometida</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {pendingAcometidas.map(sale => (
+                                        <tr key={sale.id}>
+                                            <td style={{ fontWeight: 500 }}>{sale.clientName}</td>
+                                            <td>{sale.projectName}</td>
+                                            <td>Lote {sale.lotNumber}</td>
+                                            <td style={{ fontWeight: 600, color: '#f59e0b' }}>
+                                                {formatCurrency(sale.acometidaValue)}
+                                            </td>
+                                            <td>
+                                                <Link to={`/sales/${sale.id}`} className="btn btn-ghost btn-sm">
+                                                    Ver venta <FiArrowRight />
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Overdue Alerts */}
             {overdueInstallments.length > 0 && (
                 <div className="card mb-6" style={{ borderLeft: '4px solid #ef4444' }}>
@@ -349,7 +409,7 @@ function Dashboard() {
                         ) : (
                             <div className="flex flex-col gap-4">
                                 {state.projects.slice(0, 3).map(project => {
-                                    const soldLots = project.lots?.filter(l => l.status === 'sold').length || 0;
+                                    const soldLots = project.lots?.filter(l => l.status === 'sold' || l.status === 'pending_initial').length || 0;
                                     const totalLots = project.lots?.length || 0;
 
                                     return (
