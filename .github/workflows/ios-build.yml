@@ -8,7 +8,7 @@ on:
 jobs:
   build-ios:
     runs-on: macos-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,17 +41,41 @@ jobs:
             -project App.xcodeproj \
             -scheme App
 
+      # Crea un keychain dedicado para el build y lo desbloquea
+      - name: Create build keychain
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          KEYCHAIN_PASSWORD=buildpass123
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          # Agrega al search list
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+
+      # Importa los certificados al keychain dedicado
       - name: Import Apple certificates
-        uses: apple-actions/import-codesign-certs@v3
-        with:
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATES_P12 }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATES_PASSWORD }}
+        run: |
+          CERT_FILE=$RUNNER_TEMP/build_certificate.p12
+          echo "${{ secrets.APPLE_CERTIFICATES_P12 }}" | base64 --decode > "$CERT_FILE"
+          security import "$CERT_FILE" \
+            -k "$KEYCHAIN_PATH" \
+            -P "${{ secrets.APPLE_CERTIFICATES_PASSWORD }}" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/xcodebuild
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "Certificates imported:"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
 
       - name: Write App Store Connect API Key
         run: |
           mkdir -p ~/private_keys
-          echo "${{ secrets.APPLE_PRIVATE_KEY_BASE64 }}" | base64 --decode > ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8
-          echo "Key file created, first line:"
+          echo "${{ secrets.APPLE_PRIVATE_KEY_BASE64 }}" | base64 --decode \
+            > ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8
+          echo "Key file created:"
           head -1 ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8
 
       - name: Build iOS app
@@ -66,6 +90,7 @@ jobs:
             -archivePath $RUNNER_TEMP/App.xcarchive \
             DEVELOPMENT_TEAM=C59HC2JBRC \
             CODE_SIGN_STYLE=Automatic \
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             MARKETING_VERSION=2.0.0 \
             -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8 \
@@ -86,14 +111,16 @@ jobs:
             -authenticationKeyIssuerID ${{ secrets.APPLE_ISSUER_ID }} \
             -allowProvisioningUpdates
 
-      - name: Upload to App Store Connect
+      - name: Upload to TestFlight via App Store Connect API
         run: |
           xcrun altool --upload-app \
             -f $RUNNER_TEMP/output/App.ipa \
             -t ios \
-            --apple-id 6759450478 \
-            --bundle-id com.loteclick.app \
-            --bundle-version ${{ github.run_number }} \
-            --bundle-short-version-string 2.0.0 \
             --apiKey ${{ secrets.APPLE_KEY_ID }} \
             --apiIssuer ${{ secrets.APPLE_ISSUER_ID }}
+
+      # Limpia el keychain temporal
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN_PATH" || true
